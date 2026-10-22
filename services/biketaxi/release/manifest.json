@@ -1,0 +1,72 @@
+{
+  "service": "biketaxi",
+  "title": "Bike taxi",
+  "include": [
+    "app",
+    "libs/platform",
+    "libs/taxicore",
+    "services/biketaxi",
+    "libs/partnercore",
+    "DEPLOY.md"
+  ],
+  "exclude": [
+    "app/runtime",
+    "app/uploads",
+    "app/uploads_bkp",
+    "app/backups",
+    "app/config/secrets.php",
+    "app/config/db_bkp.php",
+    "app/web/index-test.php",
+    "app/modules/customerapp",
+    "app/modules/managerapp",
+    "app/modules/publicweb",
+    "app/modules/comingsoon",
+    "app/modules/support",
+    "app/web/haltingdriver.php",
+    "app/web/haltingdriver-dashboard.php",
+    "app/web/cartaxi.php",
+    "app/web/cartaxi-dashboard.php",
+    "app/web/autotaxi.php",
+    "app/web/autotaxi-dashboard.php",
+    "services/biketaxi/release/dist",
+    "app/glue"
+  ],
+  "excludeSuffixes": [
+    ".bak",
+    ".zip",
+    ".log"
+  ],
+  "excludePatterns": [
+    "^app/assets/[0-9a-f]{6,8}/",
+    "^app/web/assets/",
+    "^app/vendor/[^/]+/[^/]+/(tests?|docs?|examples?)/"
+  ],
+  "emptyDirs": [
+    "app/runtime",
+    "app/web/assets"
+  ],
+  "profiles": {
+    "api": {
+      "excludePatterns": [
+        "^app/vendor/(npm-asset|bower-asset|almasaeed2010|twbs|select2)/",
+        "^app/vendor/kartik-v/yii2-icons/",
+        "^app/vendor/(fakerphp|phpspec|yiisoft/yii2-(debug|faker|gii))/",
+        "^app/themes/",
+        "^app/assets/",
+        "^app/web/(css|images|js)/",
+        "^app/modules/admin/views/",
+        "^(services/[^/]+/partner-dashboard|libs/[^/]+/dashboard)/views/"
+      ],
+      "exclude": [
+        "app/web/haltingdriver-dashboard.php",
+        "app/web/cartaxi-dashboard.php",
+        "app/web/autotaxi-dashboard.php",
+        "app/web/biketaxi-dashboard.php",
+        "app/web/_dashboard.php",
+        "app/web/index.php",
+        "app/index.php"
+      ],
+      "note": "API processes only: no dashboard views or front-end asset packages. Use the full release for the dashboard."
+    }
+  }
+}

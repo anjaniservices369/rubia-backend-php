@@ -1,0 +1,295 @@
+
+
+/* Extra small devices (phones, 600px and down) */
+@media only screen and (max-width: 600px) {
+    li.how_it_wrks {
+        padding: 9px 40px;
+        /* display: inline-block !important; */
+        /* margin-left: 3%; */
+    }
+    .hdr_dspl_stl{
+        display: block;
+    }
+    .navbar-nav {
+        margin: 0px -7px;
+    }
+    .how_it_wrks a,.blg a,.hmdgr_icon .btn{
+        color: #000 !important;
+    }
+    .how_it_wrks a {
+        color: #000 !important;
+    }
+    .form-control {
+        width: 100% !important;
+    }
+    .blk_ttl:before, .blk_ttl:after{
+        width: unset;
+    }
+    .ppl_prd_img {
+        height: 40px;
+        width: 100%;
+    }
+    .ppl_prd_ttl,.prd_ttl,.cat_ttl {
+        font-size: 10px;
+    }
+    .ppl_prd_btn{
+        font-size: 10px;
+    }
+    /* .cat_ttl{
+        transform: translate(0,61%);
+    } */
+    .bd_cnt_dglt_mrg{
+        margin-top: 13.5%;
+    }
+    .ppl_prd_ttl {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .prd_ttl{
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .navbar-toggle{
+        margin-right: 4px;
+    }
+    .navbar-inverse{
+        padding: unset;
+    }
+    .navbar-inverse .navbar-collapse,.navbar-inverse .navbar-collapse, .navbar-inverse .navbar-form{
+        background: white !important;
+        border-color: #fff !important;
+    }
+    .navbar-form{
+        margin-top: unset;
+        margin-bottom: unset;
+    }
+    .prd_pg_ttl{
+        margin-left: unset;
+        padding: 0.8% 3%;
+    }
+    .sidebar{
+        width: 100%;
+        padding: 0 3%;
+        padding-right: 4%;
+    }
+    .prd_pg_pdng{
+        padding: 6%;
+    }
+    .prd_img_blk {
+        text-align: center;
+        height: 180px;
+        width: 100%;
+        margin-bottom: 5%;
+    }
+    .bttn--gts {
+        text-transform: uppercase;
+        color: #fff;
+        background-color: #dc8d28 !important;
+        /* padding: 19px 70px !important; */
+        padding: 19px 55px !important;
+    }
+    .bttn--gts:after{
+        background-image:unset;
+    }
+    .ribbon2{
+        top: -14px;
+        right: -7px;
+    }
+    .see_mr_btn{
+        font-size: 12px;
+    }
+    .navbar-brand{
+        padding-left: 3% !important;
+    }
+    .navbar-inverse .navbar-toggle{
+        border-color:transparent !important;
+    }
+    section.sec_stl{
+        padding: 1% 0%;
+    }
+    .navbar-inverse .navbar-toggle:focus, .navbar-inverse .navbar-toggle:hover{
+        background-color: transparent;
+    }
+    .cat_img_blk{
+        min-height: 30px;
+    }
+    .ovl_str_ttl{
+        font-size: 14px;
+    }
+    .ovl_avbl_ofr {
+        font-size: 13px;
+        margin: 0;
+    }
+    .ovl_avbl_ofr_dec {
+        font-size: 11px;
+    }
+    footer .main-footer{
+        padding-top: 10% !important;
+    }
+    .mb_rm_pdng,.top_bnr_sec_pd{
+        padding: unset !important;
+    }
+    .acrdn_sec_stl{
+        padding-left: 1% !important;
+        padding-right: 1.5% !important;
+    }
+    .all_str_blk {
+        min-height: 55px !important;
+        max-height: 55px;
+        overflow: hidden;
+        /* height: 113px; */
+    }
+    .fltr_sec_mbv_mrg {
+        margin-top: 16%;
+    }
+    .filters.filters--shops ul {
+        padding: 0;
+    }
+    .filters--shops {
+        text-align: center;
+    }
+    .filters {
+        cursor: pointer;
+        position: relative;
+        padding: 0;
+        background: transparent;
+    }
+    .filters--shops li {
+        margin: 0;
+    }
+    li:first-child {
+        position: static;
+    }
+    .filters--shops a {
+        font-size: 18px;
+        font-size: 1.8rem;
+        display: -moz-inline-stack;
+        display: inline-block;
+        zoom: 1;
+        *display: inline;
+        background: #fff;
+        border-radius: 8px;
+        border-bottom: 2px solid #ececec;
+        width: 53px;
+        height: 52px;
+        text-align: center;
+        line-height: 52px;
+        margin: 0 7px 6px 0;
+    }
+    .str_ofr_cat_blk .nav-tabs>li{
+        width: 33%;
+    }
+    .crd_str_img_blk, .dl_dtls_blk{
+        border-right: unset;
+    }
+    .crd_str_img_blk:after, .dl_dtls_blk:after,.crd_str_img_blk:before, .dl_dtls_blk:before{
+        content:unset;
+    }
+    .crd_str_img_blk img {
+        width: 50%;
+        position: relative;
+        left: 50%;
+        transform: translate(-50%);
+    }
+    .srchbr_rw_bg{
+        margin-top: 15%;
+    }
+    .crd_str_img_blk {
+        padding: 0% 0;
+    }
+    .shp_nw_btn_blk{
+        padding-top: unset;
+        padding-bottom: 5%;
+    }
+    .btn-coupon, .shp_nw_btn{
+        border: 1px solid #F89F1E;
+    }
+    .crd_str_img_blk, .dl_dtls_blk, .gt_ofr_btn_blk {
+        min-height: 61px;
+    }
+    .ftr_hdr_blk.qt_blk h5 {
+        font-size: 16px;
+    }
+    .qt_blk_cnt {
+        font-size: 15px;
+        padding-left: 7%;
+    }
+    form.lng_drpdwn_frm .form-control{
+        color: #000;
+        border: 1px solid #cccccc;
+    }
+    #login-overlay.modal-dialog{
+        width: 98% !important;
+    }
+    .top_bnr_stl{
+        height: unset;
+    }
+    .blk_ttl{
+        padding: 2% 3%;
+        margin-bottom: 4%;
+    }
+    .see_mr_btn{
+        margin-top: 6%;
+    }
+    .str_pg_cnt_mrg{
+        margin-top: 16%;
+    }
+    .mb_rm_pdng{
+        padding: unset;
+    }
+    .shr_blk_sub_hd{
+        margin-bottom: 6%;
+    }
+    .site_logo_blk {
+        height: 54px;
+        width: unset;
+    }
+    .navbar-brand {
+        padding: 1% 0;
+    }
+    .site_logo_blk img {
+        max-height: 100%;
+        border-radius: 4px;
+        object-fit: scale-down;
+        -webkit-box-flex: 0;
+    }
+
+    /* div.mb_fltr_stk_blk{
+        position:sticky;
+        top:7.7%;
+        z-index: 99;
+    } */
+
+} 
+
+/* Small devices (portrait tablets and large phones, 600px and up) */
+@media only screen and (min-width: 600px) {
+
+} 
+
+/* Medium devices (landscape tablets, 768px and up) */
+@media only screen and (max-width: 768px) {
+   
+    .faq__question{
+        font-size: 15px;
+    }
+    .plstr_btns{
+        top: unset;
+        transform:unset;
+    }
+    .dwnld_mbl_blk img{
+        left: 50% !important;
+        margin-top: 7%;
+    }
+    .dwnld_ap_blk{
+        background-color:#104c8e !important;
+        background-image: unset;
+    }
+    .rfrn_btn_blk a, .csbk_extnsn_btn a{
+        font-size: 13px;
+    }
+} 

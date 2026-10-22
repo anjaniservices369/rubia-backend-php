@@ -1,0 +1,47 @@
+.md-dialog-container {
+	z-index: 99999999;
+}
+
+.file__Info {
+	background-color: #f1f1f1;
+	padding: 14px;
+	margin: 10px;
+}
+
+.devider {
+	border-top: 1px solid #9e9e9e;
+	padding: 1px;
+	margin: 20px;
+}
+
+label.setting {
+	width: 100%;
+}
+
+.file__Settings>input {
+	width: 100% !important;
+}
+
+.file__Settings .setting .setting-input {
+	float: left;
+	width: 100%;
+	margin: 1px 0;
+}
+
+.input-group-btn .add-more {
+	top: 24px;
+}
+
+.add-more-fields {
+	margin-top: 20px;
+}
+
+.image_container {
+	margin-left: 135px;
+	margin-top: 50px;
+}
+
+.compatibleProduct {
+	text-decoration: underline;
+	margin-left: 15px;
+}

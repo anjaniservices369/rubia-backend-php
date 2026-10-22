@@ -1,0 +1,38 @@
+# Dependencies (installed by composer, not committed)
+vendor/
+**/vendor/
+node_modules/
+
+# Secrets - never commit real credentials
+app/config/secrets.php
+app/config/jwt-secret.php
+service-account-file.json
+putty.exe.gpg
+*.pem
+*.key
+
+# Writable / generated at runtime
+app/runtime/
+app/web/assets/
+app/uploads/
+app/uploads_bkp/
+**/runtime/
+**/uploads/
+
+# Backups, DB dumps, release artifacts - large, not source
+_backups-20261014/
+app_bs4_backup_20261012/
+app_pre_modules_backup_20261013/
+*.sql
+*.sql.gz
+*.zip
+*.bak
+*.bak-*
+db_backup_*
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/

@@ -1,0 +1,33 @@
+.bx_shadow{
+    box-shadow: 0px 1px 4px 0px #d6d2d2;
+    background: #fff;
+}
+section.drdrct_sec_stls {
+    padding: 12% 0;
+}
+
+.drdrct_pg_blk {
+    text-align: center;
+}
+.drdrct_crd_blk {
+    padding: 2% 6%;
+    border-top: 4px solid #0097A7;
+}
+.drdrct_pg_blk h2 {
+    font-size: 22px;
+}
+.drdrct_pg_blk h1 span {
+    font-size: 20px;
+}
+.drdrct_pg_blk h1 {
+    color: #0097A7;
+    font-weight: bold;
+    border-bottom: 2px dashed #bcbcbc;
+    padding-bottom: 2%;
+}
+.drdrct_pg_blk p img {
+    width: 3%;
+}
+.drdrct_cnt_blk {
+    text-align: center;
+}

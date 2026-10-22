@@ -1,0 +1,524 @@
+
+
+
+section.sec_stl{
+   padding: 1% 3%;
+}
+@media only screen and (max-width: 600px) {
+   html, body {
+   width: 100%;
+   overflow-x: hidden;
+}
+}
+.pg_padng {
+   padding: 6% 5%;
+}
+
+         /*.profile-page-container .profile-sidebar .profile-tabs .router-link-active .innerSpan {
+             color: black;
+             font-weight: bold;
+         }*/
+         .profile-page-container .profile-sidebar .profile-tabs .sidetab span {
+             padding-left: 10px;
+         }
+         .profile-page-container .profile-sidebar .profile-tabs .sidetab .how-it-works-side-show, .profile-page-container .profile-sidebar .profile-tabs .sidetab>a {
+             display: block;
+             height: 49px;
+             line-height: 49px;
+             padding-left: 14px;
+         }
+         .profile-page-container .profile-sidebar .profile-tabs .sidetab-innerTab {
+         margin-top: 0px;
+         margin-left: 30px;
+         margin-bottom: 15px;
+     }
+     .profile-page-container .profile-sidebar .profile-tabs .sidetab-innerTab div {
+         margin-top: 10px;
+     }
+     .profile-page-container .profile-sidebar .profile-tabs .sidetab span {
+         color: #6C747F;
+         padding-left: 10px;
+     }
+    
+         .show_data {
+         position: relative;
+         top: -35px;
+         }
+         #preloader {
+         position: fixed;
+         top: 0;
+         left: 0;
+         right: 0;
+         bottom: 0;
+         background-color: #fff;
+         z-index: 99;
+         opacity: 0.2;
+         }
+         #status {
+         width: 200px;
+         height: 200px;
+         position: absolute;
+         left: 50%;
+         top: 50%;
+         background-image: url(http://techweblabs.tk/cashback/web/frontend/assets/img/filter.gif);
+         background-repeat: no-repeat;
+         background-position: center;
+         margin: -100px 0 0 -100px;
+         }
+         .wd_mny_actv {
+    background: #F89F1E;
+}
+.sidetab.wd_mny_actv a span {
+    color: #000 !important;
+}
+         .newtab {
+         background: #fff;
+         height: 335px;
+         max-height: 335px;
+         }
+      .form-control{ width: 94%;}
+      .profile-sprite {
+         background: url(../frontend/assets/img/profile-sprites.png?v=20170318) no-repeat;
+         display: inline-block;
+      }
+      .overview {
+         height: 18px;
+         background-position: -1045px -214px;
+      }
+      .user-transfer {
+         height: 18px;
+         background-position: -1102px -214px;
+      }
+      .cashback-activity-sidebar {
+         height: 18px;
+         background-position: -5px 0;
+      }
+      .refer-earn-sidebar {
+         height: 18px;
+         background-position: -1064px -214px;
+      }
+      .help-support-sidebar {
+         height: 18px;
+         background-position: -1026px -214px;
+      }
+      .profile-page-container .main-body .payment-container {
+         border-radius: 5px;
+         border: 1px solid #D8E0E2;
+         background-color: white;
+      }
+      .profile-page-container .main-body .payment-container {
+         width: 100%;
+         float: right;
+      }
+  
+      .profile-page-container .main-body .payment-container .payment-body {
+         padding: 30px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-title {
+         text-align: center;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-title {
+         color: #4a4a4a;
+         font-size: 24px;
+         padding-top: 20px;
+         margin: 0;
+         font-weight: bold;
+      }
+      .payment-title .cb-text {
+         font-weight: bold;
+      }
+      text {
+         color: #2BA828 !important;}
+         .profile-page-container .main-body .payment-container .payment-body .payment-title span {
+         color: #2BA828;
+      }
+      .payment-title .cb-text .ico {
+         width: 30px;
+         height: 35px;
+         margin-right: 3px;
+      }
+      .cb-text>span {
+         vertical-align: middle;
+      }
+      .cb-text .ico {
+         display: inline-block;
+         width: 41px;
+         height: 35px;
+		 background: url(../frontend/assets/img/cusm2.png) no-repeat center ;
+         /*background: url(../frontend/assets/img/currency-tilt-green.png) no-repeat center;*/
+         
+         background-size: contain;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-distribution {
+         text-align: center;
+         font-size: 14px;
+      }
+      .cb-text {
+         color: #2BA828 !important;
+         font-weight: 500;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-distribution .cb-text .ico {
+         width: 30px;
+         height: 20px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-desc {
+         text-align: center;
+         color: #625c5a;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-desc {
+         font-weight: 300;
+         font-size: 14px;
+         letter-spacing: 0.2px;
+         padding-top: 2px;
+         margin: 0;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-desc-line {
+         height: 2px;
+         background-color: #dbdbdb;
+         margin: 30px 0 35px 0;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .recently-added-accounts {
+         margin-bottom: 45px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options {
+         margin: 25px 0 45px 0;
+         min-height: 275px;
+         border: 1px solid #D8E0E2;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt {
+         border-right: 1px solid #D8E0E2;
+         display: inline-table;
+         /*width: 409px;*/
+         width: 366px;
+         height: 240px;
+         text-align: center;
+         position: relative;
+         padding: 20px 20px 30px 20px;
+         box-sizing: border-box;
+         border-bottom: 1px solid #D8E0E2;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .recharge-title {
+         color: #4a4a4a;
+         font-weight: bold;
+         letter-spacing: 1px;
+         margin-top: 25px;
+         font-size: 18px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .recharge-desc {
+         color: #9b9b9b;
+         margin-top: 10px;
+         min-height: 40px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .partner-section {
+         height: 35px;
+         margin-top: 10px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .unavailable-warning {
+         color: #ff4e0c;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .balance-avail span {
+         color: #9b9b9b;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .btn-pay.grey-out {
+         background-color: #9b9b9b;
+         border-color: #9b9b9b;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .btn-pay {
+         border: 2px solid #ff4e0c;
+         display: inline-block;
+         cursor: pointer;
+         color: white;
+         font-family: Arial;
+         font-size: 14px;
+         font-weight: bold;
+         padding: 5px 10px;
+         margin-top: 15px;
+         text-decoration: none;
+         outline: none;
+         width: 161px;
+         border-radius: 2px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .dropdown-content {
+         display: none;
+         margin-top: 2px;
+         border-radius: 0px;
+         position: absolute;
+         border: 2px solid #ff4e0c;
+         left: 125px;
+         background-color: #fff;
+         width: 155px;
+         box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+      }
+      body .payment-container .payment-body .payment-options .pay-opt .dropdown-content .add-new {
+         font-weight: normal;
+         font-size: 13px;
+         margin-left: -5px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .dropdown-content .dropdown-elem {
+         border-bottom: 1px solid #D8E0E2;
+         text-align: left;
+         padding: 9px;
+         cursor: pointer;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .dropdown-content .dropdown-elem i {
+         color: #ff4e0c;
+         font-size: 12px;
+         padding-right: 5px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .min-withdrawal-amt {
+         margin-top: 15px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .min-withdrawal-amt span {
+         font-weight: bold;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .max-daily-withdrawal-amt span {
+         font-weight: bold;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .max-withdrawal-amt span{
+      font-weight: bold;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt:nth-child(2n) {
+         border-right: none !important;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt {
+         display: inline-table;
+        /* width: 409px;*/
+         width: 366px;
+         height: 240px;
+         text-align: center;
+         position: relative;
+         padding: 20px 20px 30px 20px;
+         box-sizing: border-box;
+         border-bottom: 1px solid #D8E0E2;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .recharge-title {
+         color: #4a4a4a;
+         font-weight: bold;
+         letter-spacing: 1px;
+         margin-top: 25px;
+         font-size: 18px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .partner-section {
+         height: 35px;
+         margin-top: 10px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .payment-options .pay-opt .partner-section .partner-logo {
+         width: 82px;
+         height: 35px;
+         margin: 0 5px;
+         display: inline-block;
+      }
+      .Freecharge {
+         width: 82px;
+         height: 35px;
+         background-position: -1104px -321px;
+      }
+      .PayTM {
+         width: 82px;
+         height: 35px;
+         background-position: -1182px -214px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .previous-transfer-history {
+         background-color: #f6f8f9;
+         border-radius: 4px;
+         box-shadow: 0 0 2px 0 rgba(0,0,0,0.2);
+         margin-bottom: 25px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .previous-transfer-history .history-tab {
+         font-size: 15px;
+         text-align: left;
+         color: #787878;
+         padding: 29px 0 0 15px;
+         border-bottom: 1px solid #d8d8d8;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .previous-transfer-history .history-tab .tab {
+         display: inline-block;
+         cursor: pointer;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .previous-transfer-history .history-tab .withdrawal-tab {
+         width: 150px;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .previous-transfer-history .history-tab .active-tab div {
+         color: #000000 !important;
+    font-weight: bold;
+    border-bottom: 2px solid #000000;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .previous-transfer-history .history-tab .tab div {
+         padding-bottom: 16px;
+      }
+  
+      .profile-page-container .main-body .payment-container .payment-body .previous-transfer-history .history-tab .earning-tab {
+         margin-left: 40px;
+         vertical-align: top;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .previous-transfer-history .history-tab .tab {
+         display: inline-block;
+         cursor: pointer;
+      }
+      .profile-page-container .main-body .payment-container .payment-body .previous-transfer-history .list-container {
+         padding-bottom: 10px;
+         text-align: center;
+      }
+      .alert-modal .md-modal {
+         top: 30%;
+      }
+      .alert-modal .cd-modal-body .alert-msg {
+         font-weight: 500;
+         text-align: center;
+         font-size: 16px;
+         line-height: normal;
+         height: 90px;
+         vertical-align: middle;
+         width: 440px;
+         display: table-cell;
+         padding: 10px 0;
+      }
+      #cu-modal-recharge {
+         /* min-height: 500px; */
+         height: fit-content;
+         width: 450px;
+         /* overflow-y: scroll; */
+      }
+      .cu-modal-content {
+       padding: 20px;
+      }
+      #cu-modal-recharge .cu-modal-content .cu-modal-header {
+       margin-top: -2px;
+      }
+      #cu-modal-recharge .cu-modal-content .cu-modal-body {
+       margin-top: 14px;
+      }
+      #cu-modal-recharge .recharge-tabs {
+      text-align: center;
+      }
+   #cu-modal-recharge .recharge-mobile {
+         margin-right: 20px;
+         display: inline-block;
+         padding: 2px 5px;
+         cursor: pointer;
+      }
+      #cu-modal-recharge .recharge-dth {
+         margin-left: 20px;
+         display: inline-block;
+         padding: 2px 5px;
+         cursor: pointer;
+      }
+      #voucherRewardsModal .modal-input-ctr, #cu-modal-transferWallet .modal-input-ctr, #cu-modal-recharge .modal-input-ctr, #cu-modal-transferToBank .modal-input-ctr {
+         margin-top: 10px;
+      }
+      #voucherRewardsModal .payment-input-ctr, #cu-modal-transferWallet .payment-input-ctr, #cu-modal-recharge .payment-input-ctr, #cu-modal-transferToBank .payment-input-ctr {
+         margin-bottom: 10px;
+      }
+      .payment-input-ctr {
+         position: relative;
+         z-index: 1;
+         display: inline-block;
+         width: 100%;
+         vertical-align: top;
+         margin-bottom: 35px;
+      }
+     .payment-input {
+         width: 100%;
+         height: 30px;
+        background: transparent;
+         opacity: 1;
+        /* border: 1px solid #000;*/
+         /*border-radius: 2;*/
+         font-weight: 400;
+         outline: none;
+         font-size: 14px;
+      }
+      .payment-label {
+         width: 100%;
+         bottom: 0;
+         left: 0;
+         height: 30px;
+         position: absolute;
+         pointer-events: none;
+         text-align: left;
+         color: #9b9b9b;
+         display: inline-block;
+         float: right;
+         font-size: 14px;
+      }
+      .payment-input-ctr .payment-dropdown-arrow {
+         position: absolute;
+         right: 1px;
+         color: #9da8b0;
+         font-size: 20px;
+         top: 5px;
+         z-index: -1;
+      }
+      /* .fa {
+         display: inline-block;
+         font: normal normal normal 14px/1 fonticons;
+         font-size: inherit;
+         text-rendering: auto;
+         -webkit-font-smoothing: antialiased;
+         -moz-osx-font-smoothing: grayscale;
+      } */
+      .pay-icon {
+      color: #ff4e0c;
+      padding-top: 15px;}
+
+     /* #voucherRewardsModal .modal-input-ctr .dropdown-content, #cu-modal-transferWallet .modal-input-ctr .dropdown-content, #cu-modal-recharge .modal-input-ctr .dropdown-content, #cu-modal-transferToBank .modal-input-ctr .dropdown-content {
+         z-index: 10;
+         left: 18px;
+         margin-top: -40px;
+         width: 90%;
+         max-height: 132px;
+      }
+      body input:not([type='image']), body textarea {
+      box-sizing: border-box;
+      }
+      .dropdown-content .dropdown-elem {
+         border-bottom: 1px solid #D8E0E2;
+         text-align: left;
+         padding: 7px 10px;
+         font-weight: bold;
+         cursor: pointer;
+         font-size: 13px;
+      }*/
+      /* #cu-modal-recharge .cu-modal-footer .cu-modal-submit {
+         margin-top: -10px;
+         margin-left: 10%;
+      } */
+      #voucherRewardsModal .cu-modal-submit, #cu-modal-transferWallet .cu-modal-submit, #cu-modal-recharge .cu-modal-submit, #cu-modal-transferToBank .cu-modal-submit {
+         background-color: #ff4e0c;
+         border: 1px solid #d45738;
+         position: relative;
+      }
+      .cu-modal-content .cu-modal-submit {
+         width: 300px;
+         height: 45px;
+         background-color: #ff4e0c;
+         color: #fff;
+         text-align: center;
+         font-weight: bold;
+         line-height: 45px;
+         border-radius: 25px;
+         box-shadow: 0px 10px 15px lightgrey;
+         cursor: pointer;
+         margin: auto;
+      }
+      #cu-modal-transferWallet {
+         max-height: 560px;
+         height: 100%;
+         overflow-y: auto;
+         overflow-x: hidden;
+      }
+      .dropdown-content.content {
+      display: unset !important;
+      
+         width: 100%;
+         overflow: hidden;
+         margin-top: -9%;
+         box-shadow: none;
+         height: 34px;}
+         #walletrequest{
+            width: 99%;
+            height: 90%;
+         }
+         .modal-backdrop.in {
+            display: none;
+         }

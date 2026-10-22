@@ -1,0 +1,1062 @@
+/*
+ * The look of the dashboards (every service uses this one file).
+ *
+ * Built on the usual standards of professional admin software:
+ *  - accessibility first: every text and control colour meets WCAG 2.1 AA contrast (4.5:1 for text, 3:1 for controls), a visible keyboard focus,
+ *    a "skip to content" link, no information carried by colour alone (badges have words), reduced motion respected;
+ *  - a calm neutral interface (navy-blue sidebar with white text, white cards, hairline borders) where colour is rare and meaningful:
+ *      one accent per service (links, main button, the active menu mark) and soft status colours (green, amber, red, blue) for state only;
+ *  - one type scale (14 px data text, system font stack, tabular figures for numbers) and one spacing scale (multiples of 4 px);
+ *  - light and dark themes, a layout that works from phone to wide screen, and a print version without the menu.
+ *
+ * Change the tokens below and the whole dashboard follows.
+ * Order: tokens, base, sidebar, header, page title, cards, number tiles, tables, forms, buttons, badges, alerts, map, small screens, print,
+ *        services, dark mode.
+ */
+
+/* ---------------------------------------------------------------- tokens */
+:root {
+	--rb-accent: #0f766e;
+	--rb-accent-dark: #115e59;
+	--rb-accent-soft: #ccfbf1;
+
+	--rb-bg: #f5f6f8;
+	--rb-surface: #ffffff;
+	--rb-border: #e5e7eb;
+	--rb-text: #1b2a49;            /* deep navy ink: no black anywhere */
+	--rb-muted: #4f5d78;
+	--rb-head-bg: #f3f4f6;
+	--rb-stripe: #fafafa;
+	--rb-hover: #f1f5f4;
+	--rb-input-border: #9ca3af;
+	--rb-readonly-bg: #f3f4f6;
+
+	--rb-sidebar: #0a2540;            /* navy blue */
+	--rb-sidebar-text: #ffffff;       /* white */
+	--rb-sidebar-sub: #ffffff;
+	--rb-sidebar-hover: rgba(255, 255, 255, .10);
+
+	/* state colours: a strong tone (edges) and a soft tone with its dark ink (backgrounds and text), each pair above 4.5:1 */
+	--rb-ok: #15803d;      --rb-ok-soft: #dcfce7;      --rb-ok-ink: #166534;
+	--rb-info: #0369a1;    --rb-info-soft: #e0f2fe;    --rb-info-ink: #075985;
+	--rb-warn: #b45309;    --rb-warn-soft: #fef3c7;    --rb-warn-ink: #92400e;
+	--rb-bad: #b91c1c;     --rb-bad-soft: #fee2e2;     --rb-bad-ink: #991b1b;
+	--rb-quiet: #475569;   --rb-quiet-soft: #e2e8f0;   --rb-quiet-ink: #334155;
+
+	--rb-radius: 8px;
+	--rb-radius-sm: 6px;
+	--rb-shadow: 0 1px 2px rgba(17, 24, 39, .05);
+	--rb-font: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+
+/* ---------------------------------------------------------------- base */
+html {
+	font-size: 16px;
+}
+:root,
+[data-bs-theme="light"],
+[data-bs-theme="dark"] {
+	--bs-body-color: var(--rb-text);
+	--bs-emphasis-color: var(--rb-text);
+	--bs-heading-color: var(--rb-text);
+	--bs-dark: #1b2a49;
+	--bs-dark-rgb: 27, 42, 73;
+	--bs-black: #1b2a49;
+	--bs-black-rgb: 27, 42, 73;
+}
+.text-dark,
+.text-black {
+	color: var(--rb-text) !important;
+}
+.bg-dark,
+.bg-black {
+	background-color: #1b2a49 !important;
+}
+.btn-dark {
+	--bs-btn-bg: #1b2a49;
+	--bs-btn-border-color: #1b2a49;
+	--bs-btn-hover-bg: #2a3d66;
+	--bs-btn-hover-border-color: #2a3d66;
+}
+body {
+	font-family: var(--rb-font);
+	color: var(--rb-text);
+	font-size: .875rem;
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+	--rb-link: var(--rb-accent-dark);
+	--rb-link-hover: var(--rb-accent);
+}
+.app-main {
+	background: var(--rb-bg);
+}
+.app-content {
+	padding-bottom: 2rem;
+}
+a {
+	color: var(--rb-link);
+	text-decoration: none;
+}
+a:hover {
+	color: var(--rb-link-hover);
+	text-decoration: underline;
+}
+h1, h2, h3, h4, h5, h6 {
+	color: var(--rb-text);
+	font-weight: 600;
+	line-height: 1.25;
+}
+h3 { font-size: 1.25rem; }
+h4 { font-size: 1.0625rem; }
+h5 { font-size: .9375rem; }
+h6 { font-size: .875rem; }
+.text-muted {
+	color: var(--rb-muted) !important;
+}
+small, .small {
+	font-size: .8125rem;
+}
+code {
+	color: var(--rb-quiet-ink);
+	background: var(--rb-head-bg);
+	padding: .1em .35em;
+	border-radius: 4px;
+	font-size: .85em;
+}
+/* a visible keyboard focus everywhere (WCAG 2.4.7) */
+:focus-visible {
+	outline: 2px solid var(--rb-accent);
+	outline-offset: 2px;
+}
+.rb-skip {
+	position: absolute;
+	left: .5rem;
+	top: -3rem;
+	z-index: 2000;
+	background: var(--rb-surface);
+	color: var(--rb-text);
+	padding: .5rem .9rem;
+	border-radius: var(--rb-radius-sm);
+	border: 2px solid var(--rb-accent);
+}
+.rb-skip:focus {
+	top: .5rem;
+	text-decoration: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after {
+		animation-duration: .01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: .01ms !important;
+		scroll-behavior: auto !important;
+	}
+}
+
+/* ---------------------------------------------------------------- sidebar */
+.app-sidebar {
+	background: var(--rb-sidebar) !important;
+	border-right: 0;
+	border-top: 3px solid var(--rb-accent);
+}
+.app-sidebar .brand-link,
+.app-sidebar .brand-text {
+	color: #fff;
+}
+.app-sidebar .brand-link {
+	border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+.app-sidebar .user-panel {
+	padding: 0 1rem;
+	margin: .75rem 0 1rem !important;
+	align-items: center;
+	border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+.app-sidebar .user-panel .info a {
+	color: #fff;
+	font-weight: 600;
+	font-size: .9375rem;
+	text-decoration: none;
+}
+.app-sidebar .user-panel a {
+	color: var(--rb-sidebar-text);
+	text-decoration: none;
+}
+.app-sidebar .user-panel a:hover {
+	color: #fff;
+}
+.app-sidebar .user-panel {
+	width: 100%;
+}
+.app-sidebar .user-panel .image i {
+	background: var(--rb-accent);
+	color: #fff;
+	font-size: .95em;
+	width: 32px;
+	height: 32px;
+	line-height: 32px;
+	border-radius: 50%;
+	text-align: center;
+	margin-right: .6rem;
+}
+.app-sidebar a.nav-link,
+.app-sidebar .nav-treeview a.nav-link {
+	color: var(--rb-sidebar-text);
+}
+.app-sidebar .sidebar-menu > .nav-item > .nav-link {
+	border-radius: var(--rb-radius-sm);
+	padding: .5rem .75rem;
+	font-size: .875rem;
+}
+.app-sidebar .sidebar-menu .nav-link:hover {
+	background: var(--rb-sidebar-hover);
+	color: #fff;
+	text-decoration: none;
+}
+.app-sidebar .sidebar-menu .nav-link.active,
+.app-sidebar .sidebar-menu .nav-link.active:hover {
+	background: rgba(255, 255, 255, .14);
+	color: #fff;
+	box-shadow: inset 3px 0 0 #ffffff;
+}
+.app-sidebar .nav-treeview > .nav-item > .nav-link {
+	font-size: .8125rem;
+	color: var(--rb-sidebar-sub);
+}
+.app-sidebar .nav-treeview > .nav-item > .nav-link.active {
+	color: #fff;
+}
+.app-sidebar .nav-icon {
+	opacity: .9;
+}
+
+/* ---------------------------------------------------------------- header */
+.app-header.navbar {
+	background: var(--rb-surface) !important;
+	border-bottom: 1px solid var(--rb-border) !important;
+}
+.app-header .nav-link {
+	color: var(--rb-muted);
+}
+.app-header .nav-link:hover {
+	color: var(--rb-text);
+}
+
+/* ---------------------------------------------------------------- page title and breadcrumbs */
+.app-content-header {
+	padding: 1.25rem .5rem .5rem;
+}
+.app-content-header h1 {
+	font-size: 1.375rem;
+	font-weight: 600;
+	color: var(--rb-text) !important;
+}
+.breadcrumb {
+	font-size: .8125rem;
+	justify-content: flex-end;
+	margin-bottom: 0;
+}
+.breadcrumb .breadcrumb-item a,
+.breadcrumb a {
+	color: var(--rb-muted) !important;
+}
+.breadcrumb .breadcrumb-item a:hover,
+.breadcrumb a:hover {
+	color: var(--rb-accent-dark) !important;
+}
+.breadcrumb-item + .breadcrumb-item::before {
+	color: #6b7280;
+}
+.breadcrumb-item.active {
+	color: var(--rb-text);
+}
+
+/* ---------------------------------------------------------------- cards */
+.card {
+	background: var(--rb-surface) !important;
+	border: 1px solid var(--rb-border);
+	border-radius: var(--rb-radius);
+	box-shadow: var(--rb-shadow) !important;
+	margin-bottom: 1rem;
+	color: var(--rb-text);
+}
+.card > .card-header {
+	background: transparent;
+	border-bottom: 1px solid var(--rb-border);
+	padding: .75rem 1rem;
+	font-weight: 600;
+	font-size: .9375rem;
+	border-radius: var(--rb-radius) var(--rb-radius) 0 0;
+}
+/* the heading bar of a grid (it was a loud solid blue): a quiet bar with the accent on its left edge */
+.card > .card-header.bg-primary,
+.card > .card-header.text-white {
+	background: var(--rb-head-bg) !important;
+	color: var(--rb-text) !important;
+	border-left: 4px solid var(--rb-accent);
+	border-bottom: 1px solid var(--rb-border);
+}
+.card > .card-header.bg-primary *,
+.card > .card-header.text-white * {
+	color: var(--rb-text) !important;
+}
+.card > .card-header.bg-primary .summary {
+	color: var(--rb-muted) !important;
+	font-weight: 400;
+}
+.border-primary,
+.card.border-primary,
+.kv-grid-container.border-primary,
+.panel-primary,
+.kv-panel-primary {
+	border-color: var(--rb-border) !important;
+}
+.card > .card-title {
+	display: block;
+	margin: 0;
+	font-size: .9375rem;
+	font-weight: 600;
+	border-bottom: 1px solid var(--rb-border);
+}
+.card-body {
+	padding: 1rem;
+}
+
+/* ---------------------------------------------------------------- number tiles (dashboard)
+   A white tile with the number in dark type and a coloured edge that tells the state: no solid blocks of colour. */
+.small-box {
+	background: var(--rb-surface) !important;
+	color: var(--rb-text) !important;
+	border: 1px solid var(--rb-border);
+	border-left: 4px solid var(--rb-quiet);
+	border-radius: var(--rb-radius);
+	box-shadow: var(--rb-shadow);
+	overflow: hidden;
+	min-height: 96px;
+}
+.small-box .inner {
+	padding: .875rem 1rem;
+}
+.small-box .inner h3 {
+	font-size: 1.75rem;
+	font-weight: 600;
+	line-height: 1.1;
+	margin-bottom: .25rem;
+	color: var(--rb-text);
+	font-variant-numeric: tabular-nums;
+}
+.small-box .inner p {
+	margin: 0;
+	font-size: .8125rem;
+	color: var(--rb-muted);
+}
+.small-box.bg-success { border-left-color: var(--rb-ok); }
+.small-box.bg-info { border-left-color: var(--rb-info); }
+.small-box.bg-danger { border-left-color: var(--rb-bad); }
+.small-box.bg-warning { border-left-color: var(--rb-warn); }
+.small-box.bg-secondary { border-left-color: var(--rb-quiet); }
+.small-box.bg-dark { border-left-color: var(--rb-text); }
+.small-box.bg-primary { border-left-color: var(--rb-accent); }
+.small-box.bg-success .inner h3 { color: var(--rb-ok-ink); }
+.small-box.bg-danger .inner h3 { color: var(--rb-bad-ink); }
+.small-box.bg-warning .inner h3 { color: var(--rb-warn-ink); }
+.small-box.bg-info .inner h3 { color: var(--rb-info-ink); }
+.small-box .small-box-footer {
+	color: var(--rb-link);
+}
+
+/* ---------------------------------------------------------------- tables and grids */
+.table {
+	--bs-table-striped-bg: var(--rb-stripe);
+	--bs-table-hover-bg: var(--rb-hover);
+	color: var(--rb-text);
+	margin-bottom: 0;
+	font-variant-numeric: tabular-nums;
+}
+.table > :not(caption) > * > * {
+	padding: .5rem .75rem;
+	vertical-align: middle;
+}
+.table-bordered > :not(caption) > *,
+.table-bordered > :not(caption) > * > * {
+	border-color: var(--rb-border);
+}
+.table thead th,
+.table > thead > tr > th {
+	background: var(--rb-head-bg);
+	color: var(--rb-quiet);
+	font-size: .75rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	white-space: nowrap;
+	border-bottom: 2px solid var(--rb-border);
+}
+.table thead th a,
+.grid-view thead th a {
+	color: inherit;
+	text-decoration: none;
+}
+.table thead th a:hover {
+	color: var(--rb-accent-dark);
+}
+.table tbody tr:hover > * {
+	background-color: var(--rb-hover);
+}
+.table td a {
+	font-weight: 500;
+}
+/* the little action icons: quiet grey, the delete one red */
+.table td .fa-eye,
+.table td .fa-pencil-alt,
+.table td .fas,
+.table td .far {
+	color: var(--rb-quiet);
+}
+.table td a:hover .fas,
+.table td a:hover .far {
+	color: var(--rb-accent-dark);
+}
+.table td .fa-trash,
+.table td .fa-trash-alt {
+	color: var(--rb-bad);
+}
+.kv-panel-before,
+.kv-panel-after {
+	padding: .75rem 1rem;
+	border-color: var(--rb-border);
+}
+.kv-grid-container {
+	border-radius: 0 0 var(--rb-radius) var(--rb-radius);
+}
+.summary,
+.kv-panel-pager {
+	color: var(--rb-muted);
+	font-size: .8125rem;
+}
+.grid-view table thead:first-child > tr:first-child a {
+	position: relative;
+	display: block;
+	padding: 0 16px 0 0;
+}
+.grid-view table thead:first-child > tr:first-child a:after,
+.grid-view table thead:first-child > tr:first-child a.asc:after,
+.grid-view table thead:first-child > tr:first-child a.desc:after {
+	position: absolute;
+	bottom: 0px;
+	right: 8px;
+	display: block;
+	font-family: 'Font Awesome 7 Free';
+	opacity: 0.7;
+	color: var(--rb-quiet);
+}
+.grid-view table thead:first-child > tr:first-child a:after {
+	content: "\f0dc";
+	opacity: 0.25;
+}
+.grid-view table thead:first-child > tr:first-child a.asc:after {
+	content: "\f0dd";
+}
+.grid-view table thead:first-child > tr:first-child a.desc:after {
+	content: "\f0de";
+}
+
+/* ---------------------------------------------------------------- forms (borders at 3:1 or more, so the fields can be seen) */
+.form-label,
+label {
+	font-weight: 500;
+	font-size: .8125rem;
+	color: var(--rb-quiet-ink);
+	margin-bottom: .25rem;
+}
+.form-control,
+.form-select {
+	border-color: var(--rb-input-border);
+	border-radius: var(--rb-radius-sm);
+	font-size: .875rem;
+	padding: .4375rem .75rem;
+	min-height: 2.25rem;
+}
+.form-control:focus,
+.form-select:focus {
+	border-color: var(--rb-accent);
+	box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--rb-accent) 22%, transparent);
+}
+.form-control:disabled,
+.form-control[readonly] {
+	background: var(--rb-readonly-bg);
+	color: var(--rb-muted);
+}
+.form-text {
+	color: var(--rb-muted);
+	font-size: .8125rem;
+}
+.form-check-input {
+	border-color: var(--rb-input-border);
+}
+.form-check-input:checked {
+	background-color: var(--rb-accent);
+	border-color: var(--rb-accent);
+}
+.help-block,
+.invalid-feedback {
+	font-size: .8125rem;
+}
+
+/* ---------------------------------------------------------------- buttons
+   The accent is the main button; the others are quiet. */
+.btn {
+	border-radius: var(--rb-radius-sm);
+	font-weight: 500;
+	font-size: .875rem;
+	padding: .4375rem .875rem;
+}
+.btn-primary {
+	--bs-btn-bg: var(--rb-accent);
+	--bs-btn-border-color: var(--rb-accent);
+	--bs-btn-color: #fff;
+	--bs-btn-hover-bg: var(--rb-accent-dark);
+	--bs-btn-hover-border-color: var(--rb-accent-dark);
+	--bs-btn-hover-color: #fff;
+	--bs-btn-active-bg: var(--rb-accent-dark);
+	--bs-btn-active-border-color: var(--rb-accent-dark);
+	--bs-btn-disabled-bg: var(--rb-accent);
+	--bs-btn-disabled-border-color: var(--rb-accent);
+}
+.btn-outline-primary {
+	--bs-btn-color: var(--rb-accent-dark);
+	--bs-btn-border-color: var(--rb-accent);
+	--bs-btn-hover-bg: var(--rb-accent);
+	--bs-btn-hover-color: #fff;
+	--bs-btn-hover-border-color: var(--rb-accent);
+	--bs-btn-active-bg: var(--rb-accent);
+	--bs-btn-active-border-color: var(--rb-accent);
+}
+.btn-outline-secondary {
+	--bs-btn-color: var(--rb-quiet-ink);
+	--bs-btn-border-color: var(--rb-input-border);
+	--bs-btn-hover-bg: var(--rb-head-bg);
+	--bs-btn-hover-color: var(--rb-text);
+	--bs-btn-hover-border-color: var(--rb-input-border);
+}
+.btn-success {
+	--bs-btn-bg: var(--rb-ok-soft);
+	--bs-btn-color: var(--rb-ok-ink);
+	--bs-btn-border-color: #86efac;
+	--bs-btn-hover-bg: #bbf7d0;
+	--bs-btn-hover-color: var(--rb-ok-ink);
+	--bs-btn-hover-border-color: #4ade80;
+	--bs-btn-active-bg: #bbf7d0;
+	--bs-btn-active-color: var(--rb-ok-ink);
+}
+.btn-danger {
+	--bs-btn-bg: var(--rb-bad-soft);
+	--bs-btn-color: var(--rb-bad-ink);
+	--bs-btn-border-color: #fca5a5;
+	--bs-btn-hover-bg: #fecaca;
+	--bs-btn-hover-color: var(--rb-bad-ink);
+	--bs-btn-hover-border-color: #f87171;
+	--bs-btn-active-bg: #fecaca;
+	--bs-btn-active-color: var(--rb-bad-ink);
+}
+.btn-warning {
+	--bs-btn-bg: var(--rb-warn-soft);
+	--bs-btn-color: var(--rb-warn-ink);
+	--bs-btn-border-color: #fcd34d;
+	--bs-btn-hover-bg: #fde68a;
+	--bs-btn-hover-color: var(--rb-warn-ink);
+	--bs-btn-hover-border-color: #fbbf24;
+}
+.btn-info {
+	--bs-btn-bg: var(--rb-info-soft);
+	--bs-btn-color: var(--rb-info-ink);
+	--bs-btn-border-color: #7dd3fc;
+	--bs-btn-hover-bg: #bae6fd;
+	--bs-btn-hover-color: var(--rb-info-ink);
+	--bs-btn-hover-border-color: #38bdf8;
+}
+.btn-secondary {
+	--bs-btn-bg: var(--rb-quiet-soft);
+	--bs-btn-color: var(--rb-quiet-ink);
+	--bs-btn-border-color: #cbd5e1;
+	--bs-btn-hover-bg: #cbd5e1;
+	--bs-btn-hover-color: var(--rb-quiet-ink);
+	--bs-btn-hover-border-color: #94a3b8;
+}
+.btn-sm {
+	padding: .25rem .625rem;
+	font-size: .8125rem;
+}
+
+/* ---------------------------------------------------------------- badges: soft colours (dark text on a pale background; the word says the state, not only the colour)
+   Some pages still write Bootstrap 4 badges (badge badge-success): they get the same look here. */
+.badge {
+	font-weight: 600;
+	font-size: .75rem;
+	padding: .3em .65em;
+	border-radius: 999px;
+}
+.badge.text-bg-success, .badge-success { background: var(--rb-ok-soft) !important; color: var(--rb-ok-ink) !important; }
+.badge.text-bg-info, .badge-info { background: var(--rb-info-soft) !important; color: var(--rb-info-ink) !important; }
+.badge.text-bg-warning, .badge-warning { background: var(--rb-warn-soft) !important; color: var(--rb-warn-ink) !important; }
+.badge.text-bg-danger, .badge-danger { background: var(--rb-bad-soft) !important; color: var(--rb-bad-ink) !important; }
+.badge.text-bg-secondary, .badge-secondary { background: var(--rb-quiet-soft) !important; color: var(--rb-quiet-ink) !important; }
+.badge.text-bg-primary, .badge-primary { background: var(--rb-accent-soft) !important; color: var(--rb-accent-dark) !important; }
+.badge.text-bg-light, .badge-light { background: var(--rb-head-bg) !important; color: var(--rb-text) !important; }
+.badge.text-bg-dark, .badge-dark { background: #dbe3f3 !important; color: var(--rb-text) !important; }
+.navbar-badge.badge {
+	background: var(--rb-bad) !important;
+	color: #fff !important;
+}
+
+/* ---------------------------------------------------------------- alerts, pagination, tabs */
+.alert {
+	border-radius: var(--rb-radius-sm);
+	border-width: 1px;
+}
+.alert-success { background: var(--rb-ok-soft); border-color: #86efac; color: var(--rb-ok-ink); }
+.alert-info { background: var(--rb-info-soft); border-color: #7dd3fc; color: var(--rb-info-ink); }
+.alert-warning { background: var(--rb-warn-soft); border-color: #fcd34d; color: var(--rb-warn-ink); }
+.alert-danger { background: var(--rb-bad-soft); border-color: #fca5a5; color: var(--rb-bad-ink); }
+.page-link {
+	color: var(--rb-accent-dark);
+	border-color: var(--rb-border);
+}
+.page-item.active .page-link {
+	background: var(--rb-accent);
+	border-color: var(--rb-accent) !important;
+	color: #fff;
+}
+.nav-tabs .nav-link {
+	color: var(--rb-quiet-ink);
+	border-radius: var(--rb-radius-sm) var(--rb-radius-sm) 0 0;
+}
+.nav-tabs .nav-link.active {
+	color: var(--rb-accent-dark);
+	font-weight: 600;
+	border-bottom-color: var(--rb-surface);
+}
+.nav-pills .nav-link:not(.active):hover {
+	color: var(--rb-accent-dark);
+}
+.nav-pills .nav-link.active,
+.nav-pills .show > .nav-link {
+	color: #fff;
+	background-color: var(--rb-accent) !important;
+}
+.bg-light,
+.bg-light a {
+	color: var(--rb-text) !important;
+}
+
+/* ---------------------------------------------------------------- cards in a flex layout (every page)
+   A page whose content holds two or more cards side by side in one box gets the class rb-flex (the layout adds it): the cards then sit in a wrapping flex row,
+   two to a row on wide screens and one to a row on narrow ones, all of a row the same height. A card that holds a table, a grid or a map, or that has the
+   class rb-full, takes the whole row. Cards inside Bootstrap rows and columns keep their grid and are made the same height. */
+.rb-flex {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	align-items: stretch;
+}
+.rb-flex > * {
+	flex: 1 1 100%;
+	min-width: 0;
+}
+.rb-flex > .alert {
+	margin-bottom: 0;
+}
+.rb-flex > .card {
+	/* every card the same size: three to a row (a short last row keeps the same width); the cards of a row are the same height */
+	flex: 0 0 calc((100% - 2rem) / 3);
+	max-width: calc((100% - 2rem) / 3);
+	margin-bottom: 0 !important;
+	display: flex;
+	flex-direction: column;
+}
+/* the profile pages (Drivers-profile, Customers-profile) keep two cards to a row: their sections hold wide forms */
+.rb-flex.rb-two > .card {
+	flex: 1 1 calc(50% - .5rem);
+	max-width: none;
+}
+.rb-flex > .card > .card-body {
+	flex: 1 1 auto;
+}
+.rb-flex > .card.rb-full,
+.rb-flex > .card:has(table),
+.rb-flex > .card:has(.kv-grid-container),
+.rb-flex > .card:has(.grid-view),
+.rb-flex > .card:has(.rb-map) {
+	flex: 1 1 100%;
+	max-width: 100%;
+}
+.row > [class*="col"] > .card {
+	height: calc(100% - 1rem);
+}
+.row > [class*="col"] > .small-box {
+	height: calc(100% - 1rem);
+}
+@media (min-width: 768px) {
+	/* inside a card that is a third or half of a row wide, form columns fit two, not three or four, side by side */
+	.rb-flex > .card:not(.rb-full) [class*="col-md-3"],
+	.rb-flex > .card:not(.rb-full) [class*="col-md-4"] {
+		width: 50%;
+	}
+	.rb-flex > .card:not(.rb-full) [class*="col-md-6"],
+	.rb-flex > .card:not(.rb-full) [class*="col-md-8"] {
+		width: 100%;
+	}
+}
+@media (max-width: 991.98px) {
+	.rb-flex > .card,
+	.rb-flex.rb-two > .card {
+		flex: 0 0 calc((100% - 1rem) / 2);
+		max-width: calc((100% - 1rem) / 2);
+	}
+	.rb-flex > .card.rb-full,
+	.rb-flex > .card:has(table),
+	.rb-flex > .card:has(.kv-grid-container),
+	.rb-flex > .card:has(.grid-view),
+	.rb-flex > .card:has(.rb-map) {
+		flex: 1 1 100%;
+		max-width: 100%;
+	}
+}
+@media (max-width: 575.98px) {
+	.rb-flex > .card,
+	.rb-flex.rb-two > .card {
+		flex: 1 1 100%;
+		max-width: 100%;
+	}
+}
+
+/* ---------------------------------------------------------------- a flex grid of equal cards (the Integrations list)
+   The cards flow in one wrapping flex row, three to a row on wide screens, two on medium, one on narrow, every card of a row the same height; a lone last
+   card keeps its width. The group a card belongs to (Payments, Messaging ...) is a small label at the top of the card. */
+.rb-cards {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	align-items: stretch;
+}
+.rb-cards > .rb-cards-title {
+	flex: 1 1 100%;
+	margin: .75rem 0 -.25rem;
+	font-size: .9375rem;
+	font-weight: 600;
+	color: var(--rb-quiet-ink);
+}
+.rb-cards > .rb-cards-title:first-child {
+	margin-top: 0;
+}
+.rb-cards > .card,
+.rb-cards.rb-flex > .card {
+	/* every card the same size: three to a row (a short last row keeps the same width), the same height */
+	flex: 0 0 calc((100% - 2rem) / 3);
+	max-width: calc((100% - 2rem) / 3);
+	min-height: 14rem;
+	margin: 0 !important;
+}
+.rb-cards .card .rb-clamp {
+	/* a long description is cut at four lines so no card grows taller than the others (the full text is the hover text) */
+	display: -webkit-box;
+	-webkit-line-clamp: 4;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+.rb-card-kicker {
+	font-size: .6875rem;
+	font-weight: 700;
+	letter-spacing: .06em;
+	text-transform: uppercase;
+	color: var(--rb-muted);
+	margin-bottom: .35rem;
+}
+.rb-cards > .alert,
+.rb-cards > p {
+	flex: 1 1 100%;
+}
+@media (max-width: 991.98px) {
+	.rb-cards > .card,
+	.rb-cards.rb-flex > .card {
+		flex-basis: calc((100% - 1rem) / 2);
+		max-width: calc((100% - 1rem) / 2);
+	}
+}
+@media (max-width: 575.98px) {
+	.rb-cards > .card,
+	.rb-cards.rb-flex > .card {
+		flex-basis: 100%;
+		max-width: 100%;
+		min-height: 0;
+	}
+}
+
+/* ---------------------------------------------------------------- page layouts: a wide column and a narrow column (rb-split), the dashboard grid (rb-dash)
+   Profile pages: the forms in the wide column, the status (checklist, map, the rest) in the narrow column that stays in view while you scroll.
+   Integration pages: the keys in the wide column, the webhook address and the help in the narrow one. Both columns stack on narrow screens. */
+.rb-split {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	align-items: flex-start;
+}
+.rb-split > .rb-main {
+	flex: 2 1 560px;
+	min-width: 0;
+}
+.rb-split > .rb-side {
+	flex: 1 1 300px;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+.rb-split > .rb-main > .card:last-child,
+.rb-split > .rb-side > .card,
+.rb-split > .rb-side > .row {
+	margin-bottom: 0 !important;
+}
+.rb-split > .rb-main > .card,
+.rb-split > .rb-main > .alert {
+	margin-bottom: 1rem !important;
+}
+.rb-split > .rb-main > .card:last-child {
+	margin-bottom: 0 !important;
+}
+.rb-sticky {
+	position: sticky;
+	top: 1rem;
+}
+.rb-side .rb-map {
+	height: 240px;
+}
+@media (max-width: 991.98px) {
+	.rb-sticky {
+		position: static;
+	}
+}
+/* the dashboard: its sections side by side, two to a row (the first one, Operations, takes the whole row); the numbers three to a row inside */
+.rb-dash {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+	gap: 1rem;
+	align-items: stretch;
+}
+.rb-dash > section.content {
+	min-width: 0;
+}
+.rb-dash > section.content.rb-wide {
+	grid-column: 1 / -1;
+}
+.rb-dash > section.content > .container-fluid {
+	padding: 0;
+	height: 100%;
+}
+.rb-dash > section.content .card {
+	margin: 0;
+	height: 100%;
+}
+.rb-dash > section.content:not(.rb-wide) .row > [class*="col-"] {
+	width: 33.3333%;
+	flex: 0 0 auto;
+}
+@media (min-width: 1200px) {
+	/* the Operations row: its tiles share one line, whatever their number */
+	.rb-dash > section.content.rb-wide .row {
+		flex-wrap: nowrap;
+	}
+	.rb-dash > section.content.rb-wide .row > [class*="col-"] {
+		flex: 1 1 0;
+		width: auto;
+		min-width: 0;
+	}
+}
+/* in the narrow column the lists (the checklist) are one item per line */
+.rb-side .row > [class*="col-md-4"],
+.rb-side .row > [class*="col-6"] {
+	width: 100%;
+}
+@media (max-width: 575.98px) {
+	.rb-dash {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* ---------------------------------------------------------------- footer, pagination, selects, map buttons: no black or near-black left over from the framework */
+input, button, select, textarea {
+	color: inherit;
+}
+.app-footer {
+	background: var(--rb-surface) !important;
+	color: var(--rb-muted) !important;
+	border-top: 1px solid var(--rb-border);
+}
+.app-footer a {
+	color: var(--rb-link);
+}
+.page-link,
+.page-item.disabled .page-link,
+span.page-link {
+	background-color: var(--rb-surface);
+	color: var(--rb-accent-dark);
+}
+.page-item.disabled .page-link {
+	color: var(--rb-muted);
+}
+.select2-container .select2-selection--single .select2-selection__rendered,
+.select2-container .select2-selection__clear,
+.select2-container .select2-selection__placeholder {
+	color: var(--rb-text);
+}
+.select2-container .select2-selection__placeholder {
+	color: var(--rb-muted);
+}
+.select2-container--krajee-bs5 .select2-selection,
+.select2-container--bootstrap-5 .select2-selection {
+	color: var(--rb-text);
+	border-color: var(--rb-input-border);
+}
+.leaflet-bar a,
+.leaflet-bar a:hover {
+	color: var(--rb-text);
+}
+.leaflet-container .leaflet-control-attribution,
+.leaflet-container .leaflet-control-attribution a {
+	color: var(--rb-quiet-ink);
+}
+
+/* ---------------------------------------------------------------- map card ("Joined in") */
+.rb-map {
+	height: 300px;
+	border: 1px solid var(--rb-border);
+	border-radius: var(--rb-radius-sm);
+	overflow: hidden;
+	z-index: 0;
+}
+.rb-map-off {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--rb-readonly-bg);
+	color: var(--rb-muted);
+	font-size: .8125rem;
+}
+
+/* ---------------------------------------------------------------- small screens */
+@media (max-width: 767.98px) {
+	.app-content-header h1 {
+		font-size: 1.1875rem;
+	}
+	.breadcrumb {
+		justify-content: flex-start;
+		margin-top: .25rem;
+	}
+	.card-body {
+		padding: .75rem;
+	}
+	.small-box .inner h3 {
+		font-size: 1.5rem;
+	}
+	.btn,
+	.form-control,
+	.form-select {
+		min-height: 2.5rem; /* a finger-sized target */
+	}
+	.table-responsive,
+	.kv-grid-container {
+		-webkit-overflow-scrolling: touch;
+	}
+}
+
+/* ---------------------------------------------------------------- print: the page without the menu and the top bar */
+@media print {
+	.app-sidebar,
+	.app-header,
+	.app-footer,
+	.rb-skip,
+	.btn-toolbar,
+	.kv-panel-pager {
+		display: none !important;
+	}
+	.app-main,
+	.card {
+		background: #fff !important;
+		box-shadow: none !important;
+	}
+	.app-wrapper {
+		display: block !important;
+	}
+}
+
+/* ---------------------------------------------------------------- one accent for each service
+   Only the accent changes (links, main button, the active menu mark, the line on top of the sidebar): everything else is shared.
+   Each accent is checked: white text on it is at least 4.5:1, and its dark form on white is at least 4.5:1 for links.
+   The layout puts theme-<service> on the page. */
+body.theme-haltingdriver { --rb-accent: #0f766e; --rb-accent-dark: #115e59; --rb-accent-soft: #ccfbf1; }
+body.theme-cartaxi { --rb-accent: #2563eb; --rb-accent-dark: #1d4ed8; --rb-accent-soft: #dbeafe; }
+body.theme-autotaxi { --rb-accent: #15803d; --rb-accent-dark: #166534; --rb-accent-soft: #dcfce7; }
+body.theme-biketaxi { --rb-accent: #7c3aed; --rb-accent-dark: #6d28d9; --rb-accent-soft: #ede9fe; }
+body.theme-customer { --rb-accent: #be185d; --rb-accent-dark: #9d174d; --rb-accent-soft: #fce7f3; }
+
+/* ---------------------------------------------------------------- dark mode (the moon in the top bar; follows the system until chosen) */
+[data-bs-theme="dark"] {
+	--rb-bg: #12213b;
+	--rb-surface: #1a2c4c;
+	--rb-border: #2c4268;
+	--rb-text: #e8eefc;
+	--rb-muted: #a9b8d6;
+	--rb-head-bg: #213658;
+	--rb-stripe: #172845;
+	--rb-hover: #243a60;
+	--rb-input-border: #6b82a8;
+	--rb-readonly-bg: #213658;
+	--rb-sidebar: #0c2140;
+	--rb-quiet: #cbd5e1;
+	--rb-quiet-soft: #26385a;
+	--rb-quiet-ink: #dbe3f3;
+	--rb-ok-soft: #1b4d3e;   --rb-ok-ink: #a7f3c4;
+	--rb-info-soft: #1a4466; --rb-info-ink: #bae6fd;
+	--rb-warn-soft: #5a4410; --rb-warn-ink: #fde68a;
+	--rb-bad-soft: #5c2430;  --rb-bad-ink: #fecaca;
+	--rb-shadow: 0 1px 2px rgba(5, 15, 40, .25);
+}
+[data-bs-theme="dark"] body { background: var(--rb-bg); color: var(--rb-text); }
+[data-bs-theme="dark"] body.theme-haltingdriver { --rb-accent-soft: #1a5550; --rb-accent-dark: #5eead4; }
+[data-bs-theme="dark"] body.theme-cartaxi { --rb-accent-soft: #24418a; --rb-accent-dark: #93c5fd; }
+[data-bs-theme="dark"] body.theme-autotaxi { --rb-accent-soft: #1d5a38; --rb-accent-dark: #86efac; }
+[data-bs-theme="dark"] body.theme-biketaxi { --rb-accent-soft: #432a7d; --rb-accent-dark: #c4b5fd; }
+[data-bs-theme="dark"] body.theme-customer { --rb-accent-soft: #6a2349; --rb-accent-dark: #f9a8d4; }
+[data-bs-theme="dark"] .app-main { background: var(--rb-bg); }
+[data-bs-theme="dark"] .app-header.navbar { background: var(--rb-surface) !important; }
+[data-bs-theme="dark"] .app-content-header h1,
+[data-bs-theme="dark"] .app-content-header .breadcrumb a { color: var(--rb-text) !important; }
+[data-bs-theme="dark"] .breadcrumb .breadcrumb-item a { color: var(--rb-muted) !important; }
+[data-bs-theme="dark"] .table { --bs-table-color: var(--rb-text); --bs-table-bg: transparent; color: var(--rb-text); }
+[data-bs-theme="dark"] .table tbody tr:hover > * { color: var(--rb-text); }
+[data-bs-theme="dark"] .filters td,
+[data-bs-theme="dark"] tr.filters > td,
+[data-bs-theme="dark"] .table > tbody > tr.filters > * { background: var(--rb-head-bg); }
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select { background-color: var(--rb-surface); color: var(--rb-text); }
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus { box-shadow: 0 0 0 .2rem rgba(125, 211, 224, .25); }
+[data-bs-theme="dark"] .select2-container--krajee-bs5 .select2-selection,
+[data-bs-theme="dark"] .select2-container .select2-selection--single { background-color: var(--rb-surface); border-color: var(--rb-input-border); }
+[data-bs-theme="dark"] .select2-container .select2-selection__rendered { color: var(--rb-text); }
+[data-bs-theme="dark"] .btn-light { --bs-btn-bg: var(--rb-head-bg); --bs-btn-color: var(--rb-text); --bs-btn-border-color: var(--rb-border); }
+[data-bs-theme="dark"] .btn-success { --bs-btn-border-color: #2f7d62; --bs-btn-hover-bg: #236150; }
+[data-bs-theme="dark"] .btn-danger { --bs-btn-border-color: #a34a57; --bs-btn-hover-bg: #74303d; }
+[data-bs-theme="dark"] .btn-warning { --bs-btn-border-color: #9a7b1f; --bs-btn-hover-bg: #6e5316; }
+[data-bs-theme="dark"] .btn-info { --bs-btn-border-color: #3b7ba6; --bs-btn-hover-bg: #235579; }
+[data-bs-theme="dark"] .btn-secondary { --bs-btn-border-color: #4a6088; --bs-btn-hover-bg: #34507d; }
+[data-bs-theme="dark"] .btn-primary { --bs-btn-color: #0c2140; --bs-btn-hover-color: #0c2140; --bs-btn-bg: var(--rb-accent-dark); --bs-btn-border-color: var(--rb-accent-dark); --bs-btn-hover-bg: var(--rb-text); --bs-btn-hover-border-color: var(--rb-text); }
+[data-bs-theme="dark"] .alert-success { border-color: #2f7d62; }
+[data-bs-theme="dark"] .alert-info { border-color: #3b7ba6; }
+[data-bs-theme="dark"] .alert-warning { border-color: #9a7b1f; }
+[data-bs-theme="dark"] .alert-danger { border-color: #a34a57; }
+[data-bs-theme="dark"] .badge.text-bg-dark,
+[data-bs-theme="dark"] .badge-dark { background: #26385a !important; color: #e8eefc !important; }
+[data-bs-theme="dark"] .rb-map { filter: brightness(.85) contrast(1.05); }
+[data-bs-theme="dark"] .form-check-input { background-color: var(--rb-surface); }
+[data-bs-theme="dark"] .form-check-input:checked { background-color: var(--rb-accent-dark); border-color: var(--rb-accent-dark); }
