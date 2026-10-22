@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: PHP syntax check (changed + all tracked PHP files)
+        run: |
+          set -e
+          find app -name '*.php' -not -path '*/vendor/*' -not -path '*/runtime/*' -print0 \
+            | xargs -0 -n1 -P4 php -l
+          find libs services customer -name '*.php' -not -path '*/vendor/*' 2>/dev/null \
+            | xargs -r -n1 -P4 php -l
+
+      - name: Composer validate
+        run: |
+          cd app
+          composer validate --no-check-publish --no-check-all || true
