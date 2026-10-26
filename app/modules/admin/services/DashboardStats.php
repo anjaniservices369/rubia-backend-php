@@ -28,7 +28,11 @@ class DashboardStats
      * Ride categories shown on the dashboard: the active vehicles (Bike, Auto, Taxi, ...).
      * Labels follow the taxi service names: Bike Taxi, Auto Taxi, Car Taxi.
      *
-     * @return array[] each ['id' => int, 'label' => string]
+     * @return array[] each ['id' => int, 'label' => string, 'key' => string]
+     *
+     * 'id' is vehicals.id, a different numbering from ServiceModules/serviceDashboard (vehicals uses
+     * whatever order the rows were created in; ServiceModules fixes 2=Taxi, 3=Auto, 4=Bike). Match by
+     * 'key' (the vehicle title, lowercased), not 'id', when scoping this to one service's own dashboard.
      */
     public static function categories()
     {
@@ -38,7 +42,7 @@ class DashboardStats
         $categories = [];
         foreach ($rows as $row) {
             $key = strtolower(trim($row['title']));
-            $categories[] = ['id' => (int) $row['id'], 'label' => $names[$key] ?? $row['title']];
+            $categories[] = ['id' => (int) $row['id'], 'label' => $names[$key] ?? $row['title'], 'key' => $key];
         }
 
         return $categories;

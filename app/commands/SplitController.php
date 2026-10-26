@@ -12,6 +12,7 @@ use yii\db\Query;
  * Planning the move of a service to its own database (see ARCHITECTURE_TARGET.md).
  *
  *   php yii split/plan --service=1        what the driver service owns, how many rows, and what is still shared
+ *   php yii split/plan-customer           same report for the Customer app (user_role='User'); no --apply exists yet
  *   php yii split/copy --service=1 --target=NAME [--apply]
  *                                         copy the service into a NEW database NAME and reconcile counts and money
  *
@@ -41,6 +42,17 @@ class SplitController extends Controller
         'driver_wallet', 'user_wallet', 'coupon', 'coupons_applied', 'user_referral_earnings', 'driver_referral_earnings',
         'driver_earnings', 'ride_earnings', 'taxi_payout', 'service_map', 'service_map_pincode', 'service_invoice',
         'service_invoice_counter', 'service_billing_profile', 'map_log',
+    ];
+
+    /** Tables the Customer app owns outright (identified by a `user_id` column that points at a user_role='User' row). */
+    private static $customerOwned = [
+        'user_wallet', 'user_emergency_contacts', 'favourite_location', 'user_booking_ratings',
+    ];
+
+    /** Tables referencing customers but shared with the driver/taxi services too (filtered by user_id, not moved wholesale). */
+    private static $customerShared = [
+        'booking' => 'user_id', 'ride_request' => 'user_id', 'auth' => 'user_id',
+        'auth_session' => 'create_user_id', 'fcm_notification' => 'user_id',
     ];
 
     // [doc:start] options - Options
@@ -100,6 +112,56 @@ class SplitController extends Controller
         return ExitCode::OK;
     }
     // [doc:end] actionPlan
+
+    // [doc:start] actionPlanCustomer - Plan (customer app)
+    /**
+     * php yii split/plan-customer   what the Customer app owns, how many rows, and what stays shared.
+     *
+     * Read-only, same as plan: counts and reports, writes nothing. Customers are the `user` rows with
+     * user_role='User' - their id is NOT renumbered here (see the note below on why that is unsafe) - only
+     * their own operational data is reported as what would move to a Customer-app database.
+     */
+    public function actionPlanCustomer()
+    {
+        $db = Yii::$app->db;
+        $customerFilter = ['user_role' => 'User'];
+        $totalCustomers = (int) (new Query())->from('user')->where($customerFilter)->count();
+        $this->stdout("Customer app\n\n");
+        $this->stdout("Customers (user.user_role = 'User'): $totalCustomers rows. Their id is NOT renumbered -\n");
+        $this->stdout("auth, auth_session and every FK below already point at these ids, and mobile sessions carry\n");
+        $this->stdout("the id in a signed JWT, so renumbering would log every customer out and break every reference.\n");
+
+        $this->stdout("\nTables that move with it (whole table, filtered to customers' own rows):\n");
+        $total = 0;
+        foreach (self::$customerOwned as $t) {
+            if (!$db->getTableSchema($t)) {
+                $this->stdout(sprintf("  %-28s (not in this database)\n", $t));
+                continue;
+            }
+            $n = (int) (new Query())->from($t)->where(['user_id' => (new Query())->select('id')->from('user')->where($customerFilter)])->count();
+            $total += $n;
+            $this->stdout(sprintf("  %-28s %8d rows\n", $t, $n));
+        }
+
+        $this->stdout("\nTables shared with the driver/taxi services (only the customer-referencing rows would be a replica there):\n");
+        foreach (self::$customerShared as $t => $col) {
+            $schema = $db->getTableSchema($t);
+            if (!$schema || !isset($schema->columns[$col])) {
+                $this->stdout(sprintf("  %-28s (not in this database or no %s column)\n", $t, $col));
+                continue;
+            }
+            $n = (int) (new Query())->from($t)->where([$col => (new Query())->select('id')->from('user')->where($customerFilter)])->count();
+            $this->stdout(sprintf("  %-28s %8d rows reference a customer (stays shared, not moved)\n", $t, $n));
+        }
+
+        $this->stdout("\nStays outside (shared identity and platform): user, auth, auth_session, web_setting, city, states, notification,\n");
+        $this->stdout("media, page, banner*, services. The Customer app refers to people by user id only, same as the other services.\n");
+        $this->stdout("\nRows that would move: $total\n");
+        $this->stdout("Nothing was changed.\n");
+
+        return ExitCode::OK;
+    }
+    // [doc:end] actionPlanCustomer
 
     /** Partner accounts: the user rows of the service's own partners move with it (a replica, the user app keeps customers). */
     private static $partnerTables = ['driver_details'];

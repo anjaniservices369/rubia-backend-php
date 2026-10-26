@@ -51,7 +51,7 @@
 
 /* ---------------------------------------------------------------- base */
 html {
-	font-size: 16px;
+	font-size: 18px;
 }
 :root,
 [data-bs-theme="light"],
@@ -839,7 +839,7 @@ label {
 /* the dashboard: its sections side by side, two to a row (the first one, Operations, takes the whole row); the numbers three to a row inside */
 .rb-dash {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+	grid-template-columns: 1fr;
 	gap: 1rem;
 	align-items: stretch;
 }
@@ -876,11 +876,6 @@ label {
 .rb-side .row > [class*="col-md-4"],
 .rb-side .row > [class*="col-6"] {
 	width: 100%;
-}
-@media (max-width: 575.98px) {
-	.rb-dash {
-		grid-template-columns: 1fr;
-	}
 }
 
 /* ---------------------------------------------------------------- footer, pagination, selects, map buttons: no black or near-black left over from the framework */

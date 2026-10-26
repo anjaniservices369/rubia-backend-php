@@ -44,8 +44,10 @@ $this->beginPage();
      ->getBaseUrl() ?>/uploads/<?php echo $icon; ?>" type="image/x-icon">
 
 	<?php $this->head(); ?>
-	<!-- <link href="//fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700" rel="stylesheet"> -->
-	
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
 	<!-- <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css"> -->
 </head>
 <!-- the look of the dashboard lives in modules/admin/assets/css/admin.css -->

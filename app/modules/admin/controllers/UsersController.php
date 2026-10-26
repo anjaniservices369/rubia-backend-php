@@ -454,6 +454,8 @@ public function actionUserBankView($id)
 	{
 		$searchModel = new UserSearch();
 		$dataProvider = $searchModel->search(Yii::$app->request->queryParams,User::ROLE_USER,User::TYPE_PERSONAL);
+		// Customers-profile: arranged by id unless the admin picks a different column to sort by.
+		$dataProvider->sort->defaultOrder = ['id' => SORT_ASC];
 		return $this->render('index', [
 			'searchModel'  => $searchModel,
 			'dataProvider' => $dataProvider,

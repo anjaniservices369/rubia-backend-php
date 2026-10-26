@@ -100,7 +100,9 @@ use app\modules\admin\widgets\Menu;
                        'options' => ['class' => 'bold'],
                    ],
                ],
-               'visible' => \Yii::$app->user->identity->user_role==User::ROLE_ADMIN,
+               // Removed from the nav on every dashboard: its settings have moved to Integrations
+               // (per-service pages plus the shared ones). The route/data are untouched, just unlinked.
+               'visible' => false,
            ],
            [
                'label' => 'Dashboard Integrations',
@@ -131,7 +133,9 @@ use app\modules\admin\widgets\Menu;
                        'options' => ['class' => 'bold'],
                    ],
                ],
-               'visible' => \Yii::$app->user->identity->user_role==User::ROLE_ADMIN,
+               // Assigned from the main super admin panel only, not from any individual service's own dashboard.
+               'visible' => empty(\Yii::$app->params['serviceDashboard']) && empty(\Yii::$app->params['customerDashboard'])
+                   && \Yii::$app->user->identity->user_role==User::ROLE_ADMIN,
            ],
            [
             'label' => 'Franchise',
@@ -158,6 +162,19 @@ use app\modules\admin\widgets\Menu;
                        'options' => ['class' => 'bold'],
                    ],
                    [
+                       'label' => 'Customer Map',
+                       'url' => ['/admin/customer-map/index'],
+                       'options' => ['class' => 'bold'],
+                   ],
+                   [
+                       'label' => 'Cities',
+                       // Same shared city list Halting drivers manages (CityController is not service-specific);
+                       // added here too so a Customer app franchise/admin can see and manage cities without
+                       // switching to another service's dashboard.
+                       'url' => ['/admin/city'],
+                       'options' => ['class' => 'bold'],
+                   ],
+                   [
                        'label' => 'Integrations',
                        // the Customer app holds the customers: its Google, SMS, push, e-mail and storage keys are the customers' own
                        'url' => ['/admin/integrations/index'],
@@ -173,7 +190,9 @@ use app\modules\admin\widgets\Menu;
             'label' => 'Services',
             'icon' => 'fas fa-taxi',
             'url' => ['/admin/services'],
-            'visible' => \Yii::$app->user->identity->user_role==User::ROLE_ADMIN,
+            // Assigned from the main super admin panel only, not from any individual service's own dashboard.
+            'visible' => empty(\Yii::$app->params['serviceDashboard']) && empty(\Yii::$app->params['customerDashboard'])
+                && \Yii::$app->user->identity->user_role==User::ROLE_ADMIN,
         ],
         /// Driver Module
            [

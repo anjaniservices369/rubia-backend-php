@@ -93,14 +93,14 @@ $config = [
 				
 				
 				'mailer' => [
-						// SMTP via Gmail. Username/password (an App Password, not the account's real password)
-						// come from the dashboard: Integrations > Gmail SMTP, which DashboardMailer overrides
-						// these placeholder values with at runtime.
+						// SMTP via the domain's own mailbox (smtp.rubia.services). Username/password come from
+						// the dashboard: Integrations > E-mail (SMTP), which DashboardMailer overrides these
+						// placeholder values with at runtime. 'smtps' = implicit TLS, matching port 465.
 						'class' => 'app\components\DashboardMailer',
 						'transport' => [
-							'scheme' => 'smtp',
-							'host' => 'smtp.gmail.com',
-							'port' => 587,
+							'scheme' => 'smtps',
+							'host' => 'smtp.rubia.services',
+							'port' => 465,
 							'username' => '',
 							'password' => '',
 						],

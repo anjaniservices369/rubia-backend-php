@@ -98,6 +98,16 @@ $this->registerJs($js, \yii\web\View::POS_READY);
                     ],
                     'contact_no',
                     [
+                        // the city is found from the address the customer gave (see Customer Map), so a franchise finds its customers by city
+                        'attribute' => 'city_id',
+                        'label' => 'City (from address)',
+                        'format' => 'raw',
+                        'filter' => \yii\helpers\ArrayHelper::map((new \yii\db\Query())->select(['id', 'name'])->from('city')->where(['status' => 1])->orderBy('name')->all(), 'id', 'name'),
+                        'value' => function ($model) {
+                            return \yii\helpers\Html::encode($model->city_name ?: '');
+                        },
+                    ],
+                    [
                         'attribute' => 'status',
                         'filter' => \app\models\User::getStatusesList(),
                         'format' => 'raw',

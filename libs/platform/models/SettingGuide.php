@@ -66,8 +66,8 @@ class SettingGuide
             'media_ride_retention_days' => ['Photo storage', self::PLAIN, 'Ride photos older than this many days are deleted (default 180). Documents and profile photos are never deleted.'],
             // Messaging, maps, e-mail, payouts
             'sms_api_key' => ['2Factor SMS', self::SECRET, '2Factor dashboard > API: your API key (the same text is used in the login OTP calls).'],
-            'gmail_username' => ['Gmail SMTP (e-mail)', self::PRIVATE_ID, 'The full Gmail address that sends these e-mails (e.g. rubia.services@gmail.com).'],
-            'gmail_app_password' => ['Gmail SMTP (e-mail)', self::SECRET, 'That Google account needs 2-Step Verification on: Google Account > Security > 2-Step Verification > App passwords > create one for "Mail". A 16-character code, shown once.'],
+            'mail_username' => ['E-mail (SMTP)', self::PRIVATE_ID, 'The full mailbox address that sends these e-mails (e.g. info@rubia.services).'],
+            'mail_password' => ['E-mail (SMTP)', self::SECRET, 'That mailbox\'s password (cPanel > Email Accounts).'],
             'google_maps_server_key' => ['Maps and routes', self::SECRET, 'Google Cloud Console > APIs & Services > Credentials: a key restricted to the Directions and Geocoding APIs and to the IP address of your server.'],
             'google_maps_browser_key' => ['Google Maps', self::PRIVATE_ID, 'A key restricted to your dashboard web address (HTTP referrer). A browser key is visible in the page, so the restriction is its protection.'],
             // Charges and commission (Halting drivers)

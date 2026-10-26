@@ -76,6 +76,7 @@ $this->params['subheading'] = '';
     </section>
     <?php endif; ?>
 
+    <?php if (!empty($showDriverBookings)) : ?>
     <section class="content">
         <div class="container-fluid">
 
@@ -174,6 +175,7 @@ $this->params['subheading'] = '';
             </div>
         </div>
     </section>
+    <?php endif; ?>
 <?php } ?>
 
 <?php foreach ($rideBlocks as $block) {

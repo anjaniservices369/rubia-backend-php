@@ -80,6 +80,14 @@ Back office: `modules/admin` (controllers, views, models, search models). All Ac
 | 10 | `STATUS_DRIVER_CANCELLED` | (offer status; the booking returns to 1) |
 | 11 | `STATUS_CANCELLED` | admin cancel / blocked customer |
 
+**Vehicle-verification photos (app-enforced, not a backend gate):** the driver app requires a selfie + 4 car-side
+photos before it will call `start-ride`, and the same 6 shots again before it will call `complete-ride` (uploaded via
+`/api/media/upload` then attached with `POST /api/driver/vehicle-verification` `json_data=[{booking_id, image,
+image_type, type}, ...]`, `type` 1=before/2=after, `image_type` 1..6 = front/back/side-one/side-two/damages/selfie).
+The backend itself does not check that these rows exist before accepting `start-ride` or `complete-ride` - skipping
+them from a raw API call still works. Confirmed live on a physical device (2026-10-23): both verification steps are
+mandatory in the installed app's UI flow with no visible skip option.
+
 Guards you must keep (they were missing and were security holes):
 
 - customer `cancel-ride`: booking must belong to the caller (`user_id`); status 1, 2 or 4 only.

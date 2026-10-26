@@ -61,12 +61,12 @@ class Integrations
                 'fields' => ['onesignal_app_id' => true, 'onesignal_api_key' => true],
                 'docs' => 'https://documentation.onesignal.com/docs/keys-and-ids', 'testable' => true,
             ],
-            'gmail' => [
-                'name' => 'Gmail SMTP', 'category' => 'Messaging', 'icon' => '&#9993;',
-                'purpose' => 'E-mails: password reset (sender, subject and wording of the reset e-mail) and contact forms. Sent through Gmail\'s own SMTP server, logged in as a real Gmail account. That account needs 2-Step Verification turned on, so an App Password can be created for it -- Gmail no longer accepts the account\'s normal password over SMTP.',
-                'fields' => ['gmail_username' => true, 'gmail_app_password' => true, 'mail_from' => false, 'mail_from_name' => false, 'reset_subject' => false, 'reset_text' => false],
+            'email_smtp' => [
+                'name' => 'E-mail (SMTP)', 'category' => 'Messaging', 'icon' => '&#9993;',
+                'purpose' => 'E-mails: password reset (sender, subject and wording of the reset e-mail) and contact forms. Sent through the domain\'s own mailbox (smtp.rubia.services), logged in as a real mailbox account.',
+                'fields' => ['mail_username' => true, 'mail_password' => true, 'mail_from' => false, 'mail_from_name' => false, 'reset_subject' => false, 'reset_text' => false],
                 'multiline' => ['reset_text'],
-                'docs' => 'https://support.google.com/accounts/answer/185833', 'testable' => false,
+                'docs' => '', 'testable' => false,
             ],
             'google_maps' => [
                 'name' => 'Maps and routes', 'category' => 'Maps', 'icon' => '&#128205;',
@@ -101,6 +101,52 @@ class Integrations
                 'name' => 'Customer settings', 'category' => 'Charges', 'icon' => '&#128100;', 'plain' => true, 'services' => ['haltingdriver', 'customer'],
                 'purpose' => 'Rules for the customers of Halting drivers: referral reward, cancellation charge, how long the driver waits for the customer and how often drivers are notified of a new booking.',
                 'fields' => ['user_referral_earning' => false, 'user_cancellation_charge' => false, 'user_waiting_time' => false, 'notification_period' => false],
+                'testable' => false,
+            ],
+            // Moved out of Web Setting > Notification Setting (they used to sit in one shared, unfiltered
+            // list there). The taxi family's GST/dispatch settings are one shared row apiece, same value
+            // and same box on all three of their own Integrations pages -- not per-service copies.
+            'ride_settings' => [
+                'name' => 'Ride settings', 'category' => 'Charges', 'icon' => '&#128176;', 'plain' => true, 'services' => ['cartaxi', 'autotaxi', 'biketaxi'],
+                'purpose' => 'GST and how a ride is offered to drivers: dispatch mode, radius and how long one offer waits before the next driver is tried. Shared by Car taxi, Auto taxi and Bike taxi.',
+                'fields' => ['cgst' => false, 'sgst' => false, 'auto_dispatch_type' => false, 'auto_dispatch_radius' => false, 'auto_dispatch_wait_time' => false],
+                'percent' => ['cgst', 'sgst'],
+                'testable' => false,
+            ],
+            'taxi_rules' => [
+                'name' => 'Driver and customer settings', 'category' => 'Charges', 'icon' => '&#129489;', 'plain' => true, 'services' => ['cartaxi'],
+                'purpose' => 'Rules for Car taxi: minimum driver wallet balance, the driver/customer referral reward, and the rider\'s own minimum wallet balance and cancellation charge.',
+                'fields' => [
+                    'wallet_min_enforced_2' => false, 'driver_referral_earning_2' => false, 'user_referral_earning_2' => false,
+                    'taxi_rider_mim_wallet_balance' => false, 'taxi_rider_cancellation_charge' => false,
+                ],
+                'bool' => ['wallet_min_enforced_2'],
+                'testable' => false,
+            ],
+            'auto_rules' => [
+                'name' => 'Driver and customer settings', 'category' => 'Charges', 'icon' => '&#129489;', 'plain' => true, 'services' => ['autotaxi'],
+                'purpose' => 'Rules for Auto taxi: minimum driver wallet balance, the driver/customer referral reward, and the rider\'s own minimum wallet balance, cancellation charge and referral reward.',
+                'fields' => [
+                    'wallet_min_enforced_3' => false, 'driver_referral_earning_3' => false, 'user_referral_earning_3' => false,
+                    'taxi_min_wallet_balance' => false, 'taxi_cancellation_charge' => false, 'rider_referral_earning' => false,
+                ],
+                'bool' => ['wallet_min_enforced_3'],
+                'testable' => false,
+            ],
+            'bike_rules' => [
+                'name' => 'Driver and customer settings', 'category' => 'Charges', 'icon' => '&#129489;', 'plain' => true, 'services' => ['biketaxi'],
+                'purpose' => 'Rules for Bike taxi: minimum driver wallet balance, the driver/customer referral reward, and the rider\'s own minimum wallet balance and cancellation charge.',
+                'fields' => [
+                    'wallet_min_enforced_4' => false, 'driver_referral_earning_4' => false, 'user_referral_earning_4' => false,
+                    'bike_rider_mim_wallet_balance' => false, 'bike_rider_cancellation_charge' => false,
+                ],
+                'bool' => ['wallet_min_enforced_4'],
+                'testable' => false,
+            ],
+            'driver_service_rules' => [
+                'name' => 'Referral rewards', 'category' => 'Charges', 'icon' => '&#129489;', 'plain' => true, 'services' => ['haltingdriver'],
+                'purpose' => 'Driver and customer referral reward specific to the Driver service (module 1), separate from the general Halting drivers rules above.',
+                'fields' => ['driver_referral_earning_1' => false, 'user_referral_earning_1' => false],
                 'testable' => false,
             ],
             'openmoney' => [

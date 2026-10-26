@@ -87,7 +87,8 @@ display:none}
         <div class="cms-form">
             <?php $form = ActiveForm::begin(); ?>
             <p class="text-muted">
-                The SMS (2Factor) and push (OneSignal) keys are in the <a href="<?= \yii\helpers\Url::to(['/admin/integrations/index']) ?>">Integrations</a> module.
+                These settings have moved to the <a href="<?= \yii\helpers\Url::to(['/admin/integrations/index']) ?>">Integrations</a> module (SMS, push, and each
+                service's own Charges page). Anything still listed below hasn't been assigned to a service yet.
             </p>
             <div class="row">
                 <?php foreach ($notification as $setting) { ?>
@@ -146,6 +147,7 @@ display:none}
             <?php $form = ActiveForm::begin(); ?>
             <div class="row">
                 <?php foreach ($rider_settings as $setting){?>
+                <?php if (in_array($setting->setting_key, \app\modules\admin\models\Integrations::managedKeys(), true)) { continue; } ?>
                 <div class="col-md-6">
                     <?= $form->field($setting, 'setting_id')->hiddenInput(['maxlength' => true])->label(false) ?>
                     <label><?= $setting->name ?></label>
@@ -160,6 +162,7 @@ display:none}
             <?php $form = ActiveForm::begin(); ?>
             <div class="row">
                 <?php foreach ($bike_settings as $setting){?>
+                <?php if (in_array($setting->setting_key, \app\modules\admin\models\Integrations::managedKeys(), true)) { continue; } ?>
                 <div class="col-md-6">
                     <?= $form->field($setting, 'setting_id')->hiddenInput(['maxlength' => true])->label(false) ?>
                     <label><?= $setting->name ?></label>
@@ -174,6 +177,7 @@ display:none}
             <?php $form = ActiveForm::begin(); ?>
             <div class="row">
                 <?php foreach ($taxi_settings as $setting){?>
+                <?php if (in_array($setting->setting_key, \app\modules\admin\models\Integrations::managedKeys(), true)) { continue; } ?>
                 <div class="col-md-6">
                     <?= $form->field($setting, 'setting_id')->hiddenInput(['maxlength' => true])->label(false) ?>
                     <label><?= $setting->name ?></label>

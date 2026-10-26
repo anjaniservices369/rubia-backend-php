@@ -3,6 +3,7 @@
 namespace app\modules\admin\controllers;
 
 use app\modules\admin\services\DashboardStats;
+use app\modules\geo\services\ServiceModules;
 use yii;
 use app\models\User;
 use app\modules\admin\models\base\Orders;
@@ -74,8 +75,16 @@ class DashboardController extends Controller
 		$cityId = $isFranchise ? $identity->city_id : null;
 		$visible = $isAdmin || $isFranchise;
 
+		// 0 on the main super admin panel (sees every service); 1/2/3/4 on one service's own dashboard
+		// (ServiceModules: Driver/Taxi/Auto/Bike), set by that service's entry script (dashboard-entry.php).
+		$serviceDashboard = (int) (Yii::$app->params['serviceDashboard'] ?? 0);
+		$onMainPanel = $serviceDashboard === 0;
+
 		$empty = ['all' => 0, 'completed' => 0, 'cancelled' => 0, 'pending' => 0, 'ongoing' => 0, 'noDriver' => 0, 'driverRejected' => 0];
-		$bookings = $visible ? DashboardStats::bookings($cityId) : $empty;
+		// Driver Bookings is the Halting drivers service's own booking table: show it on the main panel
+		// (which sees every service) or on Halting drivers' own dashboard, never on another service's.
+		$showDriverBookings = $visible && ($onMainPanel || $serviceDashboard === ServiceModules::DRIVER);
+		$bookings = $showDriverBookings ? DashboardStats::bookings($cityId) : $empty;
 
 		$params = [
 			'modelAllBookings' => $bookings['all'],
@@ -86,19 +95,28 @@ class DashboardController extends Controller
 			'modelDriverRejectBookings' => $bookings['driverRejected'],
 		];
 
-		// One block per ride category (Bike Taxi, Auto Taxi, Car Taxi, ...). A franchise sees its own vehicle only.
+		// One block per ride category (Bike Taxi, Auto Taxi, Car Taxi, ...). A franchise sees its own vehicle
+		// only; on one taxi-family service's own dashboard, only that service's own category; Halting
+		// drivers' own dashboard shows none of these (it has no taxi/ride categories of its own).
+		$serviceCategoryKey = [ServiceModules::TAXI => 'taxi', ServiceModules::AUTO => 'auto', ServiceModules::BIKE => 'bike'];
 		$rideBlocks = [];
-		if ($visible) {
+		if ($visible && $serviceDashboard !== ServiceModules::DRIVER) {
 			foreach (DashboardStats::categories() as $category) {
 				if ($isFranchise && (int) $identity->vehicle_id !== $category['id']) {
+					continue;
+				}
+				if (!$onMainPanel && ($serviceCategoryKey[$serviceDashboard] ?? null) !== $category['key']) {
 					continue;
 				}
 				$rideBlocks[] = ['label' => $category['label'], 'stats' => DashboardStats::rides($category['id'], $cityId)];
 			}
 		}
 		$params['rideBlocks'] = $rideBlocks;
-		// the customer app's dashboard has no taxi / ride operations to show
-		$params['operations'] = ($isAdmin && empty(Yii::$app->params['customerDashboard'])) ? DashboardStats::operations() : null;
+		$params['showDriverBookings'] = $showDriverBookings;
+		// Site-wide operational numbers (drivers online, rides waiting, etc.) belong on the main panel
+		// only -- not the customer app's dashboard (no taxi/ride operations of its own), and not any one
+		// service's own dashboard either (they are not that one service's own numbers).
+		$params['operations'] = ($isAdmin && $onMainPanel) ? DashboardStats::operations() : null;
 		return $this->render('index', $params);
 	}
 	// [doc:end] actionIndex

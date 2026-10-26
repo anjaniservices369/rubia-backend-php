@@ -10,6 +10,7 @@ use app\modules\auth\services\AuthSettings;
 use yii\data\ActiveDataProvider;
 use yii\helpers\Url;
 use app\models\User;
+use app\modules\geo\services\AddressCity;
 use app\modules\admin\models\Auth;
 use app\modules\admin\models\WebSetting;
 use app\modules\admin\models\AuthSession;
@@ -443,6 +444,14 @@ if (($send_otp['Status'] ?? '') == 'Success') {
                 if (!empty($user)) {
                     $user->lat = $post['latitude'];
                     $user->lng = $post['longitude'];
+                    // The app only sends coordinates here (no typed address), so the city comes from
+                    // whichever active city's boundary contains this point -- same lookup the dashboard's
+                    // "Joined in" map already uses for an address-based point.
+                    $found = AddressCity::cityAt((float) $post['latitude'], (float) $post['longitude']);
+                    if ($found !== null) {
+                        $user->city_id = $found[0];
+                        $user->city_name = $found[1];
+                    }
                     if ($user->save(false)) {
                         $data['status'] = self::API_OK;
                         $data['detail'] = $user;
@@ -573,9 +582,9 @@ if (($send_otp['Status'] ?? '') == 'Success') {
             if (!empty($user_id)) {
                 $model = new UserEmergencyContacts();
                 $model->user_id = $user_id;
-                $model->name = $post['name'];
+                $model->name = $post['name'] ?? '';
                 $model->phone_number = $post['phone_number'];
-                $model->relationship = $post['relationship'];
+                $model->relationship = $post['relationship'] ?? '';
 
                 if ($model->save()) {
                     $data['status'] = self::API_OK;
@@ -619,7 +628,7 @@ if (($send_otp['Status'] ?? '') == 'Success') {
                 if ($model) {
                     $model->name = !empty($post['name'])?$post['name']:'';
                     $model->phone_number = $post['phone_number'];
-                    $model->relationship = $post['relationship'];
+                    $model->relationship = $post['relationship'] ?? '';
 
                     if ($model->save()) {
                         $data['status'] = self::API_OK;
