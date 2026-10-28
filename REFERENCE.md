@@ -1299,6 +1299,7 @@ Taxi CUSTOMER app API: /api/taxi-user/* - the TAXI SERVICE (bike / auto / car) s
 | `media_s3_key_id` | Object storage access key id |
 | `media_s3_key_secret` | Object storage secret access key |
 | `media_s3_region` | Object storage region (auto for Cloudflare R2) |
+| `ola_maps_api_key` | ola_maps_api_key |
 | `open_money_key` | OpenMoney key |
 | `open_money_secret` | OpenMoney secret |
 | `payment_gateway_api_key` | Payment Gateway API key (old field, copied to Razorpay key id) |
