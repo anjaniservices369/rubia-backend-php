@@ -55,7 +55,7 @@ class OtpService extends Component
     }
     // [doc:end] resend
 
-    // [doc:start] verify - Check the OTP typed by the user (provider check, or the dev-only test code).
+    // [doc:start] verify - Check the OTP typed by the user. Returns the provider-style array whose ['Status'] is 'Success' when right.
     /**
      * Check the OTP typed by the user. Returns the provider-style array whose ['Status'] is 'Success' when right.
      * For a DEV-ONLY test number (see isBypassed()) the provider is not called: the code must equal the configured
@@ -74,7 +74,7 @@ class OtpService extends Component
     }
     // [doc:end] verify
 
-    // [doc:start] isBypassed - DEV-ONLY TEST LOGIN. True only when EVERY condition holds; in production it is always false.
+    // [doc:start] isBypassed - DEV-ONLY TEST LOGIN. True only when ALL of these hold (otherwise false, whatever else is configured):.
     /**
      * DEV-ONLY TEST LOGIN. True only when ALL of these hold (otherwise false, whatever else is configured):
      *  1. the server runs in development mode (YII_ENV=dev) - never in production;

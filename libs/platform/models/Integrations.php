@@ -70,9 +70,9 @@ class Integrations
             ],
             'google_maps' => [
                 'name' => 'Maps and routes', 'category' => 'Maps', 'icon' => '&#128205;',
-                'purpose' => 'Road distance and fares, and finding a city from an address. Google, Mapbox and OpenStreetMap are built in: paste the keys of the ones you use and set the order they are asked in; one that has no key or is refused is skipped for the next. Also the maps shown in the dashboard (browser key) and in the mobile apps (app key).',
-                'fields' => ['google_maps_server_key' => false, 'mapbox_access_token' => false, 'maps_provider_order' => false, 'google_maps_browser_key' => false, 'app_google_map_api' => false],
-                'anyOf' => ['google_maps_server_key', 'mapbox_access_token'],
+                'purpose' => 'Road distance and fares, and finding a city from an address. Ola Maps, Google, Mapbox and OpenStreetMap are built in: paste the keys of the ones you use and set the order they are asked in; one that has no key or is refused is skipped for the next. Also the maps shown in the dashboard (browser key) and in the mobile apps (app key).',
+                'fields' => ['ola_maps_api_key' => false, 'google_maps_server_key' => false, 'mapbox_access_token' => false, 'maps_provider_order' => false, 'google_maps_browser_key' => false, 'app_google_map_api' => false],
+                'anyOf' => ['ola_maps_api_key', 'google_maps_server_key', 'mapbox_access_token'],
                 'docs' => 'https://developers.google.com/maps/documentation/geocoding/get-api-key', 'testable' => true,
             ],
             'storage' => [
@@ -93,14 +93,14 @@ class Integrations
             'driver_rules' => [
                 'name' => 'Driver settings', 'category' => 'Charges', 'icon' => '&#129489;', 'plain' => true, 'services' => ['haltingdriver'],
                 'purpose' => 'Rules for Halting drivers partners: joining fee, whether onboarding is enforced, minimum wallet balance, referral reward and cancellation charge.',
-                'fields' => ['driver_joining_fee' => false, 'enforce_driver_onboarding' => false, 'driver_min_wallet_bal' => false, 'driver_referral_earning' => false, 'driver_cancellation_charge' => false],
+                'fields' => ['driver_joining_fee' => false, 'enforce_driver_onboarding' => false, 'driver_min_wallet_bal' => false, 'driver_referral_earning' => false, 'driver_cancellation_charge' => false, 'driver_dispatch_radius' => false],
                 'bool' => ['enforce_driver_onboarding'],
                 'testable' => false,
             ],
             'user_rules' => [
                 'name' => 'Customer settings', 'category' => 'Charges', 'icon' => '&#128100;', 'plain' => true, 'services' => ['haltingdriver', 'customer'],
                 'purpose' => 'Rules for the customers of Halting drivers: referral reward, cancellation charge, how long the driver waits for the customer and how often drivers are notified of a new booking.',
-                'fields' => ['user_referral_earning' => false, 'user_cancellation_charge' => false, 'user_waiting_time' => false, 'notification_period' => false],
+                'fields' => ['user_referral_earning' => false, 'user_cancellation_charge' => false, 'user_waiting_time' => false, 'notification_period' => false, 'incity_boundary_buffer_km' => false, 'incity_trip_radius_km' => false, 'ride_return_tolerance_km' => false],
                 'testable' => false,
             ],
             // Moved out of Web Setting > Notification Setting (they used to sit in one shared, unfiltered
@@ -447,7 +447,7 @@ class Integrations
         }
         $ok = $working > 0;
 
-        return ['ok' => $ok, 'message' => implode('; ', $report) . ($ok ? '.' : '. No service can give road distances: switch the Routes API on for the Google key\'s project (Google Cloud > APIs & Services > Library), or paste a Mapbox access token.')];
+        return ['ok' => $ok, 'message' => implode('; ', $report) . ($ok ? '.' : '. No service can give road distances: switch the Routes API on for the Google key\'s project (Google Cloud > APIs & Services > Library), or paste an Ola Maps API key or a Mapbox access token.')];
     }
 
     private static function testStorage()

@@ -22,6 +22,7 @@ use app\modules\admin\forms\UserForm;
  */
 class DashboardController extends Controller
 {
+	// [doc:start] behaviors - Guests are sent to the sign-in page instead of hitting a null identity. Logged-in users who are not.
 	/**
 	 * Guests are sent to the sign-in page instead of hitting a null identity. Logged-in users who are not
 	 * admin/sub-admin/franchise are denied outright rather than shown a dashboard with its numbers zeroed out.
@@ -44,6 +45,7 @@ class DashboardController extends Controller
 			],
 		];
 	}
+	// [doc:end] behaviors
 
 	// [doc:start] actions - Actions
 	/**

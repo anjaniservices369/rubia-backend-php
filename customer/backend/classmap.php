@@ -21,6 +21,7 @@ return [
     'app\\modules\\admin\\models\\EmergencyContactQuery' => __DIR__ . '/../models/EmergencyContactQuery.php',
     'app\\modules\\admin\\models\\FavouriteLocation' => __DIR__ . '/../models/FavouriteLocation.php',
     'app\\modules\\admin\\models\\FavouriteLocationQuery' => __DIR__ . '/../models/FavouriteLocationQuery.php',
+    'app\\modules\\admin\\models\\LegalPageApi' => __DIR__ . '/../models/LegalPageApi.php',
     'app\\modules\\admin\\models\\Page' => __DIR__ . '/../models/Page.php',
     'app\\modules\\admin\\models\\PageQuery' => __DIR__ . '/../models/PageQuery.php',
     'app\\modules\\admin\\models\\Services' => __DIR__ . '/../models/Services.php',

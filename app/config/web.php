@@ -152,6 +152,7 @@ $config = [
 						'enablePrettyUrl' => true,
 						'rules' => array_merge(require __DIR__ . '/api-routes.php', [ 
 								'' => 'site/index' ,
+								'account-deletion' => 'site/account-deletion',
 								'privacy-policy' => 'site/privacy-policy',
 								'terms-conditions' => 'site/terms-conditions',
 								'all-stores' => 'site/all-stores',

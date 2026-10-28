@@ -64,6 +64,27 @@ class PushService extends Component
     }
     // [doc:end] notifyDriver
 
+    // [doc:start] notifyDriversBatch - Notifies many partners about the same thing with one push call (see PushNotifier::sendBatch), e.g. a new booking.
+    /**
+     * Notifies many partners about the same thing with one push call (see PushNotifier::sendBatch), e.g. a new booking
+     * offered to every driver in the radius.
+     *
+     * @param int[] $userIds
+     */
+    public function notifyDriversBatch($refId, array $userIds, $title, $body, $type = '')
+    {
+        $tokens = [];
+        foreach ($userIds as $userId) {
+            $token = (new AuthSession())->getDeviceToken($userId);
+            if (!empty($token)) {
+                $tokens[] = $token;
+            }
+        }
+
+        return PushNotifier::sendBatch($tokens, $title, strip_tags((string) $body), ['order_id' => $refId, 'type' => $type], 'driver');
+    }
+    // [doc:end] notifyDriversBatch
+
     // [doc:start] notifyVendor - Notifies a vendor/manager: push plus in-app entry.
     /**
      * Notifies a vendor/manager: push plus in-app entry.

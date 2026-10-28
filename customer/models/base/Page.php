@@ -31,6 +31,7 @@ class Page extends \yii\db\ActiveRecord
    
     CONST TYPE_PRIVACY = 1;
     CONSt TYPE_TERMS = 3;
+    CONST TYPE_REFUND = 4;
     CONST TYPE_HELP = 9;
     CONST TYPE_ABOUT = 2;
     CONST TYPE_FAQ = 10;
@@ -81,11 +82,52 @@ class Page extends \yii\db\ActiveRecord
             self::TYPE_ABOUT => \Yii::t('app', 'About Us'),
             self::TYPE_PRIVACY => \Yii::t('app', 'Privacy'),
             self::TYPE_TERMS => \Yii::t('app', 'Terms and Condtion'),
+            self::TYPE_REFUND => \Yii::t('app', 'Refund Policy'),
             self::TYPE_HELP => \Yii::t('app', 'Help'),
             self::TYPE_FAQ => \Yii::t('app', 'FAQs'),
            // self::TYPE_SHIPPING => \Yii::t('app', 'Fast shipping'),
            // self::TYPE_GUARANTEE => \Yii::t('app', '365 Day Guarantee')
         ];
+    }
+
+    /** The apps that each keep their own Terms, Privacy and Refund documents (page.app_key). */
+    const APP_CUSTOMER = 'customer';
+    const APP_DRIVER = 'haltingdriver';
+    const APP_CAR_TAXI = 'cartaxi';
+    const APP_AUTO_TAXI = 'autotaxi';
+    const APP_BIKE_TAXI = 'biketaxi';
+
+    public static function appOptions()
+    {
+        return [
+            self::APP_CUSTOMER => \Yii::t('app', 'Customer app'),
+            self::APP_DRIVER => \Yii::t('app', 'Driver partner app (Halting drivers)'),
+            self::APP_CAR_TAXI => \Yii::t('app', 'Car taxi partner app'),
+            self::APP_AUTO_TAXI => \Yii::t('app', 'Auto taxi partner app'),
+            self::APP_BIKE_TAXI => \Yii::t('app', 'Bike taxi partner app'),
+        ];
+    }
+
+    public function getAppName()
+    {
+        $apps = self::appOptions();
+        return isset($apps[$this->app_key]) ? $apps[$this->app_key] : (string) $this->app_key;
+    }
+
+    /**
+     * The newest active page of one type for one app, or null when none is published.
+     * Used by the public "legal-page" API of every app.
+     *
+     * @param string $app one of the APP_* keys
+     * @param integer $typeId one of the TYPE_* values
+     * @return static|null
+     */
+    public static function findPublished($app, $typeId)
+    {
+        return static::find()
+            ->where(['app_key' => $app, 'type_id' => $typeId, 'state_id' => self::STATE_ACTIVE])
+            ->orderBy(['id' => SORT_DESC])
+            ->one();
     }
 
     public function getType()
@@ -116,6 +158,7 @@ class Page extends \yii\db\ActiveRecord
             'description' => Yii::t('app', 'Description'),
             'state_id' => Yii::t('app', 'State ID'),
             'type_id' => Yii::t('app', 'Type ID'),
+            'app_key' => Yii::t('app', 'App'),
             'created_date' => Yii::t('app', 'Created On'),
             'updated_date' => Yii::t('app', 'Updated On'),
             'create_user_id' => Yii::t('app', 'Create User ID'),

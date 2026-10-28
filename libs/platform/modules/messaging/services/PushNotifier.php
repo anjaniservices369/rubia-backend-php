@@ -48,12 +48,61 @@ class PushNotifier
     }
     // [doc:end] send
 
-    // [doc:start] describe - Configuration status for the admin dashboard.
     /**
      * Configuration status for the admin dashboard.
      *
      * @return array [driver => string, ready => bool, note => string]
      */
+    // [doc:start] sendBatch - The same push to many devices. OneSignal takes up to 2000 subscription ids in one call, so a booking offered to.
+    /**
+     * The same push to many devices. OneSignal takes up to 2000 subscription ids in one call, so a booking offered to
+     * a hundred drivers is one request, not a hundred. Other providers get one push per device.
+     *
+     * @param string[] $deviceTokens
+     */
+    public static function sendBatch(array $deviceTokens, $title, $body, array $data = [], $app = null)
+    {
+        $deviceTokens = array_values(array_unique(array_filter($deviceTokens)));
+        if (!$deviceTokens) {
+            return false;
+        }
+        if (self::driver() !== 'onesignal') {
+            foreach ($deviceTokens as $token) {
+                self::send($token, $title, $body, $data, $app);
+            }
+
+            return true;
+        }
+
+        // Only real OneSignal subscription ids can be sent to; anything else is skipped (as in oneSignal()).
+        $ids = array_values(array_filter($deviceTokens, function ($t) {
+            return (bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string) $t);
+        }));
+        $credentials = self::credentials($app);
+        if (!$ids || !$credentials['appId'] || !$credentials['apiKey']) {
+            return false;
+        }
+        foreach (array_chunk($ids, 1000) as $chunk) {
+            $payload = [
+                'app_id' => $credentials['appId'],
+                'target_channel' => 'push',
+                'include_subscription_ids' => $chunk,
+                'headings' => ['en' => (string) $title],
+                'contents' => ['en' => (string) $body],
+                'priority' => 10,
+                'existing_android_channel_id' => self::channel($data),
+            ];
+            if ($data) {
+                $payload['data'] = $data;
+            }
+            self::post('https://api.onesignal.com/notifications?c=push', $payload, ['Authorization: Key ' . $credentials['apiKey']]);
+        }
+
+        return true;
+    }
+    // [doc:end] sendBatch
+
+    // [doc:start] describe - Describe
     public static function describe()
     {
         $driver = self::driver();
@@ -213,6 +262,14 @@ class PushNotifier
             Yii::error('push provider returned HTTP ' . $status . ': ' . $response, 'push');
         }
         curl_close($ch);
+        // OneSignal answers HTTP 200 even when it delivered nothing; its "errors" and "warnings" say why (a device id it
+        // does not know, Android notifications not set up in its dashboard...), so they are logged.
+        if ($response !== false && $status < 300) {
+            $reply = json_decode($response, true);
+            if (is_array($reply) && (!empty($reply['errors']) || !empty($reply['warnings']))) {
+                Yii::error('push not delivered: ' . substr($response, 0, 500), 'push');
+            }
+        }
 
         return $response;
     }

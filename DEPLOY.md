@@ -524,3 +524,24 @@ cards to a row, because their sections hold wide forms: their root box has the c
 - **Integrations list** (`rb-cards`): the services as equal cards, three to a row.
 - **Payments** (`rb-split`): the UPI QR form in the wide column, the Razorpay and onboarding summary in the narrow one, then the approval list and the latest payments, each in a card.
 - Other pages with several cards in one box keep the generic rule (`rb-flex`): three equal cards to a row. Both columns of a split stack on narrow screens.
+
+## 33. Release of 27 Oct 2026: booking radius, trip changes, live tracking
+
+1. Back up the Halting drivers database, then `php yii db/up --yes` (migrations 031-035: `page.app_key`, `booking_route_log`,
+   `booking.radius_alert_at`, `booking_track` and the live-distance columns on `booking`, and `pincode_map`, the maps drawn from pincodes).
+   The server's PHP needs a CA certificate bundle (`curl.cainfo`) for the pincode lookup on OpenStreetMap. Run it on the database that holds `booking` (and
+   `page` for 031). `php yii db/status` shows what is pending. Each migration has a down script.
+2. Review the settings (Integrations): **Booking radius (km)** (Driver settings, 10 if empty), **In-city trip radius (km)** (optional extra limit,
+   empty = off), **In-city boundary buffer (km)** (0 = the city map is exact) and **Return-to-pickup tolerance (km)** (Customer settings).
+   In-city means inside the city's map; check that every city you serve has its service map drawn (a city without one is never sent to outstation).
+   Look for state-wide or region-sized maps among the active cities (Maintenance of Halting drivers > City maps): a locality inside one would be
+   priced and judged in-city by that whole region. Each locality needs its own map; remove the region outlines.
+3. The dispatch cron in section 5 is still required, but a new booking is now offered immediately when it is made; the cron only reaches
+   partners who come online or move into the radius later.
+4. Push: in the OneSignal dashboard the Android app needs its FCM credentials. Without them OneSignal answers 200 and delivers nothing; the
+   backend log (`push not delivered: ...`) says so. Check `runtime/logs/app.log` after the first booking.
+5. `booking_track` grows by one row per accepted position (about 100,000 rows for a 15,000 km ride, a few MB). Delete the points of completed
+   rides older than you need them for disputes (for example 180 days, like ride photos); `booking_route_log` keeps the route of every ride
+   that was billed differently from the booking.
+6. After deploying, run the re-test list in DEVELOPER_GUIDE.md section 12 (items 10-14) against a copy of the database. The apps need the matching
+   builds (MOBILE_APP_CHANGES.md section O); old builds keep working but do not show the route card or the trip notice.

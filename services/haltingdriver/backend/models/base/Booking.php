@@ -598,6 +598,10 @@ class Booking extends \yii\db\ActiveRecord
         $data['coupon_discount'] = $this->coupon_discount;
         $data['payment_status'] = $this->payment_status;
         $data['price_detail'] = json_decode($this->price_detail,true);
+        // Booked in-city but travelled and billed outstation: the message and the route for the closing details.
+        $data += method_exists($this, 'radiusSummary') ? $this->radiusSummary() : [];
+        // While the driver is on the way or the ride is running: the driver's position and the distance so far.
+        $data += method_exists($this, 'liveTripSummary') ? $this->liveTripSummary() : [];
 
       
       $cancelChargeModel = new CancelRideCharges();
@@ -719,7 +723,7 @@ class Booking extends \yii\db\ActiveRecord
         $end = $fromTs + (int) round(max(0.0, (float) $hours) * 3600);
         $day = strtotime(date('Y-m-d', $fromTs) . ' 00:00:00 -1 day');   // the night that began the evening before
         $nights = 0;
-        for ($guard = 0; $day <= $end && $guard < 400; $guard++) {
+        for ($guard = 0; $day <= $end && $guard < 800; $guard++) {
             $nightStart = strtotime(date('Y-m-d', $day) . ' 22:00:00');
             $nightEnd = strtotime(date('Y-m-d', $day) . ' 22:00:00 +8 hours');
             if ($nightStart <= $end && $nightEnd > $fromTs) {
@@ -924,11 +928,15 @@ class Booking extends \yii\db\ActiveRecord
             $secured_fee = WebSetting::find()->where(['setting_key' => 'secured_fee'])->one();
             $platform_charges = WebSetting::find()->where(['setting_key' => 'platform_charges'])->one();
             $gstPer = WebSetting::find()->where(['setting_key' => 'gst'])->one();
-            $price['estimatePrice'] = $estimatePrice + ( !empty($secured_fee) ? (int)$secured_fee->value:0) + ( !empty($platform_charges) ? (int)$platform_charges->value:0);
+            // Same sum as the day fare above: GST on (price + fees), then price + GST + fees. (The night fare used to leave the GST
+            // it showed out of the total, and worked it out on a number that already held the fees.)
+            $feeSum = ( !empty($secured_fee) ? (int)$secured_fee->value:0) + ( !empty($platform_charges) ? (int)$platform_charges->value:0);
+            $gst = ceil(($estimatePrice + $feeSum) * ( !empty($gstPer) ? (((int)$gstPer->value)/100):1));
+            $price['estimatePrice'] = ceil($estimatePrice + $gst) + $feeSum;
             $price['baseFare'] = $baseFare;
             $price['securedFee'] = $secured_fee->value;
             $price['platformCharges'] = $platform_charges->value;
-            $price['gst'] = ceil(($price['estimatePrice'] + ( !empty($secured_fee) ? (int)$secured_fee->value:0) + ( !empty($platform_charges) ? (int)$platform_charges->value:0)) *( !empty($gstPer) ? (((int)$gstPer->value)/100):1));
+            $price['gst'] = $gst;
             $price['baseHour'] = $baseHour;
             $price['baseKm'] = $baseKm;
             $price['extraKmCharge'] = $extraKmCharge;
@@ -938,7 +946,7 @@ class Booking extends \yii\db\ActiveRecord
             $price['nightChargePerNight'] = $nightCharge;
             $price['outStationCharge'] = $outStationCharge;
             $price['estimatedDistance'] = ceil($pickupDistance);
-            $price['additionalCharges'] = ceil($additionalCharges);
+            $price['additionalCharges'] = ceil($additionalCharges + $extraMinuteCharges);
             $price['isNightChargeApplicable'] = true;
             $price['usageHours'] = $usageHours;
             $price['pickupDistance'] = $pickupDistance;
@@ -1415,62 +1423,53 @@ class Booking extends \yii\db\ActiveRecord
     //     return false;
     // }
 
-    public function calculateOutstationRoundTripEstimate()
+    // [doc:start] calculateOutstationRoundTripEstimate - Outstation round trip, priced by the hour.
+    /**
+     * Outstation round trip, priced by the HOUR. The rate card's base fare covers the base hours of the first day only. Every hour after
+     * that is charged hourly at the rate card's extra rate (extra_min_charge per minute); there is no new base fare for later days. The night
+     * charge is added for every night (22:00-06:00) the trip touches, plus the rate card's outstation charge. The customer provides the
+     * driver's food and accommodation: they are not part of the fare, and the estimate and bill say so.
+     *
+     * usage_hours is the length of the trip in hours (booked hours in the estimate, the real elapsed hours at the end of the ride).
+     */
+    public function calculateOutstationRoundTripEstimate($isFinal = '')
     {
-        // Calculate the estimate for Outstation Round Trip trip type
-        // Add your logic here
-
-        // return $estimatePrice;
-
         $secured_fee = WebSetting::find()->where(['setting_key' => 'secured_fee'])->one();
         $platform_charges = WebSetting::find()->where(['setting_key' => 'platform_charges'])->one();
         $gstPer = WebSetting::find()->where(['setting_key' => 'gst'])->one();
-        // Retrieve the CityRateCard based on the selected city
         $cityRateCard = CityRateCard::findOne([
             'city_id' => $this->city_id,
             'ride_type' => $this->rider_type,
             'trip_type' => $this->trip_type,
         ]);
 
-        // Retrieve the necessary fields from the CityRateCard object
-        $baseHour = isset($cityRateCard->base_hour)?$cityRateCard->base_hour:0;
-        $baseFare = isset($cityRateCard->base_fare)?$cityRateCard->base_fare:0;
-        $extraMinCharge = isset($cityRateCard->extra_min_charge)?$cityRateCard->extra_min_charge:0;
-        $nightCharge = isset($cityRateCard->night_charge)?$cityRateCard->night_charge:0;
-        $outStationCharge = isset($cityRateCard->out_station_charge)?$cityRateCard->out_station_charge:0;
+        $baseHour = isset($cityRateCard->base_hour) ? $cityRateCard->base_hour : 0;
+        $baseFare = isset($cityRateCard->base_fare) ? $cityRateCard->base_fare : 0;
+        $extraMinCharge = isset($cityRateCard->extra_min_charge) ? $cityRateCard->extra_min_charge : 0;
+        $nightCharge = isset($cityRateCard->night_charge) ? $cityRateCard->night_charge : 0;
+        $outStationCharge = isset($cityRateCard->out_station_charge) ? $cityRateCard->out_station_charge : 0;
+        $extraHourRate = $extraMinCharge * 60;
 
-        // Get the pickup time and calculate the booking hour
         $pickupTime = strtotime($this->pickup_time);
-        $bookingHour = date('H', $pickupTime);
+        $usageHours = (float) $this->usage_hours;
 
-        // Check if the booking hour is within the time range of 10pm to 6am
-        $isNightTimeRange = $bookingHour >= 22 || $bookingHour < 6;
+        // the base fare covers the first base hours; every further hour is charged hourly
+        $extraHours = max(0, $usageHours - $baseHour);
+        $extraCharges = ceil($extraHours * $extraHourRate);
+        $estimatePrice = $baseFare + $extraCharges;
 
-        // Calculate the usage hours
-        $usageHours = $this->usage_hours;
-
-        // Calculate the estimate price
-        $estimatePrice = $baseFare;
-
-        $extraMinuteCharges = 0;
-        // Add extra minute charges for usage hours beyond the base hours
-        if ($usageHours > $baseHour) {
-            $extraMinutes = ($usageHours - $baseHour) * 60;
-            $extraMinuteCharges = $extraMinutes * $extraMinCharge;
-            $estimatePrice += $extraMinuteCharges;
-        }
-
-        // Night charge: once for every night (22:00-06:00) the trip touches, so a trip of several days pays for each night.
+        // Night charge: once for every night (22:00-06:00) the trip touches.
         $nights = self::nightsTouched($pickupTime, $usageHours);
         $estimatePrice += $nightCharge * $nights;
-         $estimatePrice += $outStationCharge;
-         
-        $gst =  ceil(($estimatePrice  + ( !empty($secured_fee) ? (int)$secured_fee->value:0) + ( !empty($platform_charges) ? (int)$platform_charges->value:0)) * ( !empty($gstPer) ? (((int)$gstPer->value)/100):1));
-        $price['estimatePrice'] = $estimatePrice + $gst + ( !empty($secured_fee) ? (int)$secured_fee->value:0) + ( !empty($platform_charges) ? (int)$platform_charges->value:0);
+        $estimatePrice += $outStationCharge;
+
+        $fees = (!empty($secured_fee) ? (int) $secured_fee->value : 0) + (!empty($platform_charges) ? (int) $platform_charges->value : 0);
+        $gst = ceil(($estimatePrice + $fees) * (!empty($gstPer) ? (((int) $gstPer->value) / 100) : 1));
+        $price['estimatePrice'] = $estimatePrice + $gst + $fees;
         $price['baseFare'] = $baseFare;
         $price['baseHour'] = $baseHour;
-        $price['securedFee'] = $secured_fee->value;
-        $price['platformCharges'] = $platform_charges->value;
+        $price['securedFee'] = !empty($secured_fee) ? $secured_fee->value : 0;
+        $price['platformCharges'] = !empty($platform_charges) ? $platform_charges->value : 0;
         $price['gst'] = $gst;
         $price['baseKm'] = 0;
         $price['extraKmCharge'] = 0;
@@ -1479,12 +1478,15 @@ class Booking extends \yii\db\ActiveRecord
         $price['nightCount'] = $nights;
         $price['nightChargePerNight'] = $nightCharge;
         $price['outStationCharge'] = $outStationCharge;
-        $price['additionalCharges'] = ceil($extraMinuteCharges);
+        $price['additionalCharges'] = $extraCharges;
         $price['estimatedDistance'] = 0;
-
+        $price['extraHours'] = round($extraHours, 2);
+        $price['extraHourRate'] = $extraHourRate;
+        $price['driverFoodStayNote'] = "The customer provides the driver's food and accommodation during the trip. They are not included in the fare.";
         $price['isNightChargeApplicable'] = $nights > 0;
         $price['usageHours'] = $usageHours;
 
         return $price;
     }
+    // [doc:end] calculateOutstationRoundTripEstimate
 }

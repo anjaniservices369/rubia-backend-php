@@ -133,6 +133,14 @@ CouponController implements the CRUD actions for Coupon model.
 | `/admin/coupon/delete` | `actionDelete` | Deletes an existing Coupon model. |
 | `/admin/coupon/update-status` | `actionUpdateStatus` | Update Status. |
 
+### admin / customer-map - `app/modules/admin/controllers/CustomerMapController.php`
+
+Overview map of where every customer joined -- the same point each customer's own "Joined in" card already shows (app/modules/admin/views/partials/joined_map.php), plotted together on one map instead of one at a time. Admins and sub-admins only; a franchise already sees its own city's people on Customers-profile and has no need for the whole map.
+
+| URL | Action | What it does |
+|---|---|---|
+| `/admin/customer-map/index` | `actionIndex` | Every customer who has a saved point, on one map. Same "stored the other way round" correction as the. |
+
 ### admin / dashboard - `app/modules/admin/controllers/DashboardController.php`
 
 Admin dashboard home page and the logged-in admin's own profile.
@@ -767,9 +775,11 @@ Partner (driver) app API: /api/driver/* - the DRIVER SERVICE (hire a driver for 
 | `/api/driver/index` | `actionIndex` | Index. |
 | `/api/driver/logout` | `actionLogout` | Logout. |
 | `/api/driver/check` | `actionCheck` | Is my login still valid? Called at app start-up. Also refreshes the push id and returns the driver's profile. |
+| `/api/driver/legal-page` | `actionLegalPage` | GET /api/driver/legal-page?type=terms/privacy/refund (no login: shown before login). |
 | `/api/driver/send-otp` | `actionSendOtp` | Send Otp. |
 | `/api/driver/resend-otp` | `actionResendOtp` | Resend Otp. |
 | `/api/driver/verify-otp` | `actionVerifyOtp` | Login / sign-up of a partner (driver): the OTP typed by the driver is checked and, if right, the app gets its. |
+| `/api/driver/delete-account` | `actionDeleteAccount` | Deletes the signed-in account (Google Play account deletion): signs out everywhere and erases the personal details; ride and. |
 | `/api/driver/update-profile` | `actionUpdateProfile` | Update Profile. |
 | `/api/driver/update-lat-lng` | `actionUpdateLatLng` | The app reports the driver's live position (called every few seconds while online). |
 | `/api/driver/add-driver-emergency-contacts` | `actionAddDriverEmergencyContacts` | Add Driver Emergency Contacts. |
@@ -798,7 +808,7 @@ Partner (driver) app API: /api/driver/* - the DRIVER SERVICE (hire a driver for 
 | `/api/driver/list-fcm-notifications` | `actionListFcmNotifications` | List Fcm Notifications. |
 | `/api/driver/driver-status` | `actionDriverStatus` | Go online / offline. Offline drivers receive no ride offers. |
 | `/api/driver/upload-profile-picture` | `actionUploadProfilePicture` | Upload Profile Picture. |
-| `/api/driver/bookings` | `actionBookings` | The driver's ride list: offers waiting for an answer (status 1) or the rides already accepted (status 12). |
+| `/api/driver/bookings` | `actionBookings` | Bookings. |
 | `/api/driver/bookings-history` | `actionBookingsHistory` | Bookings History. |
 | `/api/driver/accept-ride` | `actionAcceptRide` | The driver accepts a ride offer. First driver wins. |
 | `/api/driver/reject-ride` | `actionRejectRide` | The driver turns an offer down. Only this driver's offer is marked rejected; the booking stays open for others. |
@@ -841,9 +851,11 @@ Partner (driver) app API: /api/driver/* - the DRIVER SERVICE (hire a driver for 
 | `/api/driver/index` | `actionIndex` | Index. |
 | `/api/driver/logout` | `actionLogout` | Logout. |
 | `/api/driver/check` | `actionCheck` | Is my login still valid? Called at app start-up. Also refreshes the push id and returns the driver's profile. |
+| `/api/driver/legal-page` | `actionLegalPage` | GET /api/driver/legal-page?type=terms/privacy/refund (no login: shown before login). |
 | `/api/driver/send-otp` | `actionSendOtp` | Send Otp. |
 | `/api/driver/resend-otp` | `actionResendOtp` | Resend Otp. |
 | `/api/driver/verify-otp` | `actionVerifyOtp` | Login / sign-up of a partner (driver): the OTP typed by the driver is checked and, if right, the app gets its. |
+| `/api/driver/delete-account` | `actionDeleteAccount` | Deletes the signed-in account (Google Play account deletion): signs out everywhere and erases the personal details; ride and. |
 | `/api/driver/update-profile` | `actionUpdateProfile` | Update Profile. |
 | `/api/driver/update-lat-lng` | `actionUpdateLatLng` | The app reports the driver's live position (called every few seconds while online). |
 | `/api/driver/add-driver-emergency-contacts` | `actionAddDriverEmergencyContacts` | Add Driver Emergency Contacts. |
@@ -872,7 +884,7 @@ Partner (driver) app API: /api/driver/* - the DRIVER SERVICE (hire a driver for 
 | `/api/driver/list-fcm-notifications` | `actionListFcmNotifications` | List Fcm Notifications. |
 | `/api/driver/driver-status` | `actionDriverStatus` | Go online / offline. Offline drivers receive no ride offers. |
 | `/api/driver/upload-profile-picture` | `actionUploadProfilePicture` | Upload Profile Picture. |
-| `/api/driver/bookings` | `actionBookings` | The driver's ride list: offers waiting for an answer (status 1) or the rides already accepted (status 12). |
+| `/api/driver/bookings` | `actionBookings` | Bookings. |
 | `/api/driver/bookings-history` | `actionBookingsHistory` | Bookings History. |
 | `/api/driver/accept-ride` | `actionAcceptRide` | The driver accepts a ride offer. First driver wins. |
 | `/api/driver/reject-ride` | `actionRejectRide` | The driver turns an offer down. Only this driver's offer is marked rejected; the booking stays open for others. |
@@ -922,6 +934,7 @@ Halting drivers service, customer side: /api/user/* booking flow (estimate, coup
 | URL | Action | What it does |
 |---|---|---|
 | `/api/user/get-estimate` | `actionGetEstimate` | Price quote for a driver-service ride - and, with ?saveBooking=true, the booking itself. |
+| `/api/user/delete-account` | `actionDeleteAccount` | Deletes the signed-in account (Google Play account deletion): signs out everywhere and erases the personal details; ride and. |
 | `/api/user/check-boundary` | `actionCheckBoundary` | Check Boundary. |
 | `/api/user/coupons-list` | `actionCouponsList` | Coupons List. |
 | `/api/user/vehicle-types` | `actionVehicleTypes` | Vehicle Types. |
@@ -1036,6 +1049,7 @@ Taxi PARTNER app API: /api/taxi/* (alias /api/skipper/*, deprecated) - the TAXI 
 | `/taxicore-partner/taxi/index` | `actionIndex` | Index. |
 | `/taxicore-partner/taxi/logout` | `actionLogout` | Logout. |
 | `/taxicore-partner/taxi/check` | `actionCheck` | Check. |
+| `/taxicore-partner/taxi/legal-page` | `actionLegalPage` | GET /api/car/legal-page?type=terms/privacy/refund (also /api/auto/... and /api/bike/...; no login). |
 | `/taxicore-partner/taxi/send-otp` | `actionSendOtp` | Send Otp. |
 | `/taxicore-partner/taxi/resend-otp` | `actionResendOtp` | Resend Otp. |
 | `/taxicore-partner/taxi/verify-otp` | `actionVerifyOtp` | Verify Otp. |
@@ -1293,7 +1307,6 @@ Taxi CUSTOMER app API: /api/taxi-user/* - the TAXI SERVICE (bike / auto / car) s
 | `razorpay_webhook_secret` | Razorpay webhook secret |
 | `reset_subject` | reset_subject |
 | `reset_text` | reset_text |
-| `sendgrid_api_key` | SendGrid API key (e-mail) |
 | `user_app_google_map_api` | user_app_google_map_api |
 | `user_google_maps_server_key` | user_google_maps_server_key |
 | `user_mail_from` | user_mail_from |
@@ -1309,10 +1322,12 @@ Taxi CUSTOMER app API: /api/taxi-user/* - the TAXI SERVICE (bike / auto / car) s
 | `verify24x7_password` | Police verification (verify24x7): password |
 | `verify24x7_username` | Police verification (verify24x7): username |
 | `driver_cancellation_charge` | Driver Cancellation Charge |
+| `driver_dispatch_radius` | Booking radius (km) |
 | `driver_joining_fee` | Driver joining fee (INR, 0 = free) |
 | `driver_min_wallet_bal` | Driver minimum wallet balance |
 | `driver_referral_earning` | driver referral earning |
 | `enforce_driver_onboarding` | Enforce driver onboarding (1 = only approved, paid drivers go online) |
+| `incity_trip_radius_km` | In-city trip radius (km) |
 | `rider_referral_earning` | Rider Referral Earning |
 | `taxi_cancellation_charge` | Auto Rider Cancellation Charge |
 | `taxi_min_wallet_balance` | Auto Rider mim wallet balance |
@@ -1328,6 +1343,9 @@ Taxi CUSTOMER app API: /api/taxi-user/* - the TAXI SERVICE (bike / auto / car) s
 
 | Command | What it does |
 |---|---|
+| `php yii admin/create-super-admin` | Creates a new user_role = admin account. |
+| `php yii admin/revoke-super-admin` | Records that super-admin access should be revoked for $email, and reminds the operator to remove it. |
+| `php yii admin/list-super-admins` | Lists every user_role = admin account and flags where the database and the allowlist disagree:. |
 | `php yii audit/users` | Users. |
 | `php yii billing/backfill` | Backfill. |
 | `php yii db/status` | Status. |
@@ -1352,6 +1370,7 @@ Taxi CUSTOMER app API: /api/taxi-user/* - the TAXI SERVICE (bike / auto / car) s
 | `php yii settings/status` | Which protected settings exist, whether they are set and whether they are encrypted. Never prints a value. |
 | `php yii settings/protect` | Encrypts the protected values that were saved as plain text. A dry run unless --apply is given. Safe to run again. |
 | `php yii split/plan` | Plan. |
+| `php yii split/plan-customer` | php yii split/plan-customer what the Customer app owns, how many rows, and what stays shared. |
 | `php yii split/copy` | Copy. |
 | `php yii split/complete` | Makes the new service database complete after split/copy: every other table of the schema is created (empty), the. |
 | `php yii split/customer` | The customer (user) app on its own database: the customers and everything that is theirs. Run split/complete. |
@@ -1383,6 +1402,18 @@ Taxi CUSTOMER app API: /api/taxi-user/* - the TAXI SERVICE (bike / auto / car) s
 - `022_integration_keys`
 - `023_media_booking`
 - `024_expire_ended_subscriptions`
+- `025_admin_audit_log`
+- `026_twilio_rename`
+- `027_twilio_email_api`
+- `028_twilio_api_key`
+- `029_gmail_smtp`
+- `030_email_smtp`
+- `031_page_app_key`
+- `032_booking_route_log`
+- `033_booking_radius_alert`
+- `034_booking_live_track`
+- `035_pincode_map`
+- `036_account_deletion_request`
 
 ## Environment variables read by the code
 
@@ -1410,10 +1441,11 @@ Taxi CUSTOMER app API: /api/taxi-user/* - the TAXI SERVICE (bike / auto / car) s
 - `MAPBOX_API_BASE`
 - `MEDIA_STORAGE_PATH`
 - `NOMINATIM_URL`
+- `OLA_MAPS_API_BASE`
+- `OTP_TEST_CODE`
 - `OTP_TEST_NUMBERS`
 - `PUBLIC_BASE_URL`
 - `PUSH_DRIVER`
 - `RAZORPAY_API_BASE`
 - `ROUTES_API_URL`
-- `SENDGRID_API_KEY`
 - `SETTINGS_ENCRYPTION_KEY`

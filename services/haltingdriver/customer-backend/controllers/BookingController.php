@@ -115,6 +115,13 @@ class BookingController extends BKController
         return $this->sendJsonResponse($data);
     }
     // [doc:end] actionIndex
+    /** SQL: the ride is closed for the customer - paid (collect-cash) and rated by this customer. */
+    private static function closedForCustomerSql()
+    {
+        return 'booking.payment_status = ' . (int) Booking::payment_status_success
+            . ' AND EXISTS (SELECT 1 FROM user_booking_ratings ubr WHERE ubr.booking_id = booking.id)';
+    }
+
     // [doc:start] actionListBookings - List Bookings
     public function actionListBookings()
     {
@@ -138,18 +145,25 @@ class BookingController extends BKController
                 if (!empty($status)) {
                     if ($status == Booking::STATUS_CANCELLED) {
                         $query->andWhere(['in', 'status', [Booking::STATUS_DRIVER_CANCELLED, Booking::STATUS_USER_CANCELLED]]);
+                    } elseif ($status == Booking::STATUS_RIDE_COMPLETED) {
+                        // Completed = finished, paid (the driver confirmed the payment) and rated by this customer.
+                        $query->andWhere(['status' => $status])->andWhere(new \yii\db\Expression(self::closedForCustomerSql()));
                     } else {
                         $query->andWhere(['status' => $status]);
                     }
                 } else {
-                    $query->andWhere(['in', 'status', [
-                        Booking::STATUS_DRIVER_ACCEPTED,
-                        Booking::STATUS_START_RIDE,
-                        Booking::STATUS_ARRIVED_LOCATION,
-                        Booking::STATUS_GO_FOR_PICKUP,
-                        // Booking::STATUS_RIDE_COMPLETED,
-                        Booking::STATUS_WAITING_FOR_DRIVER,
-                    ]]);
+                    // Active = in progress, plus a completed ride until it is paid and rated (bill, pay the driver, rate the driver).
+                    $query->andWhere(['or',
+                        ['in', 'status', [
+                            Booking::STATUS_DRIVER_ACCEPTED,
+                            Booking::STATUS_START_RIDE,
+                            Booking::STATUS_ARRIVED_LOCATION,
+                            Booking::STATUS_GO_FOR_PICKUP,
+                            Booking::STATUS_WAITING_FOR_DRIVER,
+                        ]],
+                        ['and', ['status' => Booking::STATUS_RIDE_COMPLETED],
+                            new \yii\db\Expression('NOT (' . self::closedForCustomerSql() . ')')],
+                    ]);
                 }
 
 

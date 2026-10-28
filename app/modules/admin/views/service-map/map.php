@@ -72,7 +72,8 @@ foreach ($map['cities'] as $c) {
                     do not touch the other services.
                     <?= (int) $areas['found'] ?> pincode(s) placed, <?= (int) $areas['missing'] ?> not found,
                     <?= (int) $areas['outliers'] ?> far from the others.
-                    Green outline = what these pincodes make; blue = the service area saved today.
+                    Green outline = what these pincodes make; blue = the service area in use today
+                    (<?= !empty($hasPincodeMap) ? 'the pincode map' : 'the hand-drawn map' ?>).
                 </div>
             </div>
             <?php if ($canEdit): ?>
@@ -83,11 +84,20 @@ foreach ($map['cities'] as $c) {
                 <?= Html::endForm() ?>
                 <?= Html::beginForm(['map', 'module' => $module, 'city' => (int) $city['id']], 'post', [
                     'class' => 'd-inline',
-                    'onsubmit' => 'return confirm("Use the green outline as the service area of ' . Html::encode(addslashes($title)) . ' in ' . Html::encode(addslashes($city['name'])) . '? Customers outside it will not be able to book this service.");',
+                    'onsubmit' => 'return confirm("Save the green outline as the pincode map of ' . Html::encode(addslashes($title)) . ' in ' . Html::encode(addslashes($city['name'])) . '? Customers outside it will not be able to book this service.");',
                 ]) ?>
                 <?= Html::hiddenInput('save', 1) ?>
-                <?= Html::submitButton('Use this as the service area', ['class' => 'btn btn-primary', 'disabled' => count($outline) < 3]) ?>
+                <?= Html::submitButton('Save as the pincode map', ['class' => 'btn btn-primary', 'disabled' => count($outline) < 3]) ?>
                 <?= Html::endForm() ?>
+                <?php if (!empty($hasPincodeMap)): ?>
+                <?= Html::beginForm(['map', 'module' => $module, 'city' => (int) $city['id']], 'post', [
+                    'class' => 'd-inline',
+                    'onsubmit' => 'return confirm("Remove the pincode map and go back to the hand-drawn map?");',
+                ]) ?>
+                <?= Html::hiddenInput('remove-pincode-map', 1) ?>
+                <?= Html::submitButton('Remove the pincode map', ['class' => 'btn btn-outline-danger']) ?>
+                <?= Html::endForm() ?>
+                <?php endif; ?>
             </div>
             <?php endif; ?>
         </div>
@@ -128,7 +138,7 @@ foreach ($map['cities'] as $c) {
             <?php endif; ?>
 
             <table class="table table-sm mb-0">
-                <thead><tr><th>Pincode</th><?php if ($map['taxi']): ?><th>Vehicles</th><?php endif; ?><th>Place Google found</th><th>On the map</th><?php if ($canEdit): ?><th style="width:380px">Change</th><?php endif; ?></tr></thead>
+                <thead><tr><th>Pincode</th><?php if ($map['taxi']): ?><th>Vehicles</th><?php endif; ?><th>Place found</th><th>On the map</th><?php if ($canEdit): ?><th style="width:380px">Change</th><?php endif; ?></tr></thead>
                 <tbody>
                 <?php foreach ($map['pincodes'] as $code => $info): $loc = $located[$code] ?? null; ?>
                     <tr>

@@ -39,11 +39,12 @@ $this->params['breadcrumbs'][] = $this->title;
 <?php 
     $gridColumn = [
         ['attribute' => 'id', 'visible' => false],
+        ['attribute' => 'app_key', 'label' => Yii::t('app', 'App'), 'value' => $model->appName],
+        ['attribute' => 'type_id', 'label' => Yii::t('app', 'Type'), 'value' => $model->type],
         'title',
         //'slug',
         'description:ntext',
         'state_id',
-        'type_id',
         'created_date',
         'updated_date',
         'create_user_id',

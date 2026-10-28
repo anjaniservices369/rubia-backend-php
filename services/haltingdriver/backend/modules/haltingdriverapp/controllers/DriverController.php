@@ -110,9 +110,11 @@ class DriverController extends BKController
                             'check',
                             'verify-otp',
                             'send-otp',
+                            'legal-page',
                             'resend-otp',
                             'index',
                             'update-profile',
+                            'delete-account',
                             'add-driver-emergency-contacts',
                             'update-lat-lng',
                             'apply-referral',
@@ -186,9 +188,11 @@ class DriverController extends BKController
                             'check',
                             'verify-otp',
                             'send-otp',
+                            'legal-page',
                             'resend-otp',
                             'index',
                             'update-profile',
+                            'delete-account',
                             'add-driver-emergency-contacts',
                             'update-lat-lng',
                             'apply-referral',
@@ -367,6 +371,22 @@ class DriverController extends BKController
     }
         // [doc:end] actionCheck
 
+    // [doc:start] actionLegalPage - /api/driver/legal-page - GET /api/driver/legal-page?type=terms|privacy|refund (no login: shown before login).
+    /**
+     * GET /api/driver/legal-page?type=terms|privacy|refund   (no login: shown before login)
+     * Written in the admin dashboard (Terms & Policies, app = Driver partner app).
+     */
+    public function actionLegalPage()
+    {
+        return $this->sendJsonResponse(
+            \app\modules\admin\models\LegalPageApi::response(
+                \app\modules\admin\models\Page::APP_DRIVER,
+                Yii::$app->request->get('type')
+            )
+        );
+    }
+    // [doc:end] actionLegalPage
+
     // [doc:start] actionSendOtp - /api/driver/send-otp - Send Otp
     public function actionSendOtp()
     {
@@ -526,6 +546,34 @@ if (($send_otp['Status'] ?? '') == 'Success') {
     }
     // [doc:end] actionVerifyOtp
 
+    // [doc:start] actionDeleteAccount - /api/driver/delete-account - Deletes the signed-in account (Google Play account deletion): signs out everywhere and erases the personal details; ride and.
+    /**
+     * Deletes the signed-in account (Google Play account deletion): signs out everywhere and erases the personal details; ride and
+     * payment records stay without the personal link. Refused while a ride is in progress.
+     */
+    public function actionDeleteAccount()
+    {
+        $data = [];
+        $headers = isset(\Yii::$app->request->headers['auth_code'])
+            ? \Yii::$app->request->headers['auth_code']
+            : Yii::$app->request->getQueryParam('auth_code');
+        $auth = new AuthSettings();
+        $user_id = $auth->getAuthSession($headers);
+        if (empty($user_id)) {
+            $data['status'] = self::API_NOK;
+            $data['error'] = Yii::t('app', 'You are not logged in');
+
+            return $this->sendJsonResponse($data);
+        }
+        [$ok, $message] = \app\components\AccountDeletion::deleteUser($user_id, User::ROLE_DRIVER, 'app', (string) Yii::$app->request->post('reason', ''));
+        $data['status'] = $ok ? self::API_OK : self::API_NOK;
+        $data[$ok ? 'message' : 'error'] = Yii::t('app', $message);
+
+        return $this->sendJsonResponse($data);
+    }
+    // [doc:end] actionDeleteAccount
+
+
        // [doc:start] actionUpdateProfile - /api/driver/update-profile - Update Profile
        public function actionUpdateProfile()
     {
@@ -634,12 +682,21 @@ if (($send_otp['Status'] ?? '') == 'Success') {
                         $data['error'] = 'Valid latitude and longitude are required';
                         return $this->sendJsonResponse($data);
                     }
+                    $previousLat = $user->lat;
+                    $previousLng = $user->lng;
                     $user->lat = $lat;
                     $user->lng = $lng;
 
                     // Lookup city ID based on the provided city name
 
                     if ($user->save(false)) {
+                        // A ride in progress: add the position to the ride's real-time distance (checked, deduplicated, drift removed).
+                        $trackResult = Booking::recordTrackForDriver(
+                            $user->id, $lat, $lng,
+                            $post['accuracy'] ?? null, $post['speed_kmh'] ?? null, $post['recorded_at'] ?? null
+                        );
+                        // A ride in progress that has left the in-city radius: tell the customer and the driver.
+                        $this->alertIfRadiusCrossed($user, $previousLat, $previousLng, $lat, $lng);
                         $data['status'] = self::API_OK;
                         $data['detail'] = $user;
                     } else {
@@ -2062,7 +2119,31 @@ public function actionApplyReferral()
 
     //                 // echo $query->createCommand()->getRawSql();exit;
 
-    // [doc:start] actionBookings - /api/driver/bookings - The driver's ride list: offers waiting for an answer (status 1) or the rides already accepted (status 12).
+    /**
+     * Distance and travel time from the driver's last known position (sent by the Partner app every 20 s while online)
+     * to the customer's pickup point, for the booking card. The distance is the straight line times 1.3 (roads are
+     * longer), the time assumes a city speed of 25 km/h. Both are estimates; empty when either position is unknown.
+     *
+     * @return array distance_to_pickup_km (1 decimal) and eta_to_pickup_min (whole minutes), or nulls
+     */
+    private function distanceToPickup($driver, $booking)
+    {
+        $none = ['distance_to_pickup_km' => null, 'eta_to_pickup_min' => null];
+        if (empty($driver) || !is_numeric($driver->lat) || !is_numeric($driver->lng) || (float) $driver->lat == 0.0
+            || !is_numeric($booking->pickup_latitude) || !is_numeric($booking->pickup_longitude)) {
+            return $none;
+        }
+        $dLat = deg2rad((float) $booking->pickup_latitude - (float) $driver->lat);
+        $dLng = deg2rad((float) $booking->pickup_longitude - (float) $driver->lng);
+        $h = sin($dLat / 2) ** 2 + cos(deg2rad((float) $driver->lat)) * cos(deg2rad((float) $booking->pickup_latitude)) * sin($dLng / 2) ** 2;
+        $roadKm = 12742 * asin(min(1, sqrt($h))) * 1.3;
+
+        return [
+            'distance_to_pickup_km' => round($roadKm, 1),
+            'eta_to_pickup_min' => max(1, (int) round($roadKm / 25 * 60)),
+        ];
+    }
+
     /**
      * The driver's ride list: offers waiting for an answer (status 1) or the rides already accepted (status 12).
      *
@@ -2070,6 +2151,17 @@ public function actionApplyReferral()
      * Only bookings that have a driver_requests row for this driver are shown, newest pickup time first, 10 per page.
      * Each row also carries what the driver would earn (estimate minus GST/fees minus commission).
      */
+    /**
+     * SQL: the ride is closed for the driver - paid (collect-cash) and rated by this driver (add-review). Until then a completed ride
+     * stays in the driver's Accepted rides.
+     */
+    private static function closedForDriverSql()
+    {
+        return 'booking.payment_status = ' . (int) Booking::payment_status_success
+            . ' AND EXISTS (SELECT 1 FROM driver_booking_ratings dbr WHERE dbr.booking_id = booking.id)';
+    }
+
+    // [doc:start] actionBookings - /api/driver/bookings - Bookings
     public function actionBookings()
 {
     $data = [];
@@ -2097,9 +2189,12 @@ public function actionApplyReferral()
                 // BUILD THE LIST: bookings joined to this driver's offers (driver_requests), not yet paid, not cancelled by the customer.
                 $query = Booking::find()
                     ->innerJoinWith('driverRequests as dr')
-                    ->where(['dr.driver_id' => $user_id])
-                    ->andWhere(['booking.payment_status' => Booking::payment_status_pending ])
-                    ;
+                    ->where(['dr.driver_id' => $user_id]);
+                // Offers and rides in progress are unpaid; the Accepted list also keeps a completed ride until it is paid and this
+                // driver has rated the customer, so it is not filtered by payment here.
+                if ($status != Booking::STATUS_ACCEPTED_RIDES) {
+                    $query->andWhere(['booking.payment_status' => Booking::payment_status_pending]);
+                }
 
                 // Add a condition to filter out canceled bookings
                 $query->andWhere(['!=', 'booking.status', Booking::STATUS_USER_CANCELLED]);
@@ -2114,21 +2209,23 @@ public function actionApplyReferral()
                     // "Accepted rides" = every ride the driver holds that is not finished: accepted, on the way, arrived, started.
                     // Anything else = bookings in that single status, excluding the ones this driver already rejected.
                     if ($status == Booking::STATUS_ACCEPTED_RIDES) {
-                        $query->andWhere([
-                            'IN',
-                            'booking.status',
-                            [
+                        // A completed ride stays here (bill, collect payment, rate the customer) until the payment is collected AND this
+                        // driver has rated the customer; then it moves to Completed.
+                        $query->andWhere(['OR',
+                            ['booking.status' => [
                                 Booking::STATUS_DRIVER_ACCEPTED,
                                 Booking::STATUS_GO_FOR_PICKUP,
                                 Booking::STATUS_START_RIDE,
                                 Booking::STATUS_ARRIVED_LOCATION,
-
-                            ],
+                            ]],
+                            ['AND', ['booking.status' => Booking::STATUS_RIDE_COMPLETED],
+                                new \yii\db\Expression('NOT (' . self::closedForDriverSql() . ')')],
                         ])
                         ->andWhere(['booking.driver_id' => $user_id]);
                     } else {
+                        // Offers this driver turned down, or accepted and then cancelled, are not offered to them again.
                         $query->andWhere(['booking.status' => $status])
-                        ->andWhere(['!=','dr.status',Booking::STATUS_DRIVER_REJECTED]);
+                        ->andWhere(['NOT IN','dr.status',[Booking::STATUS_DRIVER_REJECTED, Booking::STATUS_DRIVER_CANCELLED]]);
                     }
                 }
 
@@ -2160,6 +2257,9 @@ public function actionApplyReferral()
                 // Add the driver's expected earning to each booking: estimate - GST - fees = base; commission = base x %; driver gets the rest.
                 foreach ($dataProvider->getModels() as $booking) {
                     $bookingData = $booking->asJson();
+
+                    // HOW FAR AND HOW LONG: from this driver's last known position to the customer's pickup point.
+                    $bookingData += $this->distanceToPickup($driver, $booking);
 
                     $estimatePrice = $bookingData['estimate_price'] ?? 0;
                     $gst = $bookingData['gst'] ?? 0;
@@ -2253,15 +2353,20 @@ public function actionApplyReferral()
                                 ],
                             ])->andWhere(['booking.driver_id' => $user_id]);
                         } else if($status==Booking::STATUS_CANCELLED) {
+                            // CANCELLED RIDES: rides this driver actually held that did not happen.
+                            //  - the customer cancelled: the booking keeps its driver and shows as cancelled by the customer;
+                            //  - this driver cancelled: the booking goes back to the pool (and loses its driver), so the driver's own
+                            //    offer row, marked "driver cancelled", is what puts it in this list.
+                            // Offers the driver only turned down were never theirs and are not listed.
                             $query->andWhere(['OR',
-                                    ['dr.status' => Booking::STATUS_DRIVER_REJECTED],
-                                    ['booking.status' => Booking::STATUS_DRIVER_CANCELLED],
-                                    ['booking.status' => Booking::STATUS_USER_CANCELLED],
-
-                        ])->andWhere(['booking.driver_id' => $user_id])
-                        ;
+                                ['AND', ['booking.driver_id' => $user_id],
+                                    ['booking.status' => [Booking::STATUS_USER_CANCELLED, Booking::STATUS_DRIVER_CANCELLED]]],
+                                ['dr.status' => Booking::STATUS_DRIVER_CANCELLED],
+                            ]);
                         } else if($status==Booking::STATUS_RIDE_COMPLETED) {
+                            // Completed = finished, payment collected and the customer rated by this driver (until then it is in Accepted rides).
                             $query->andWhere(['in','booking.status',[Booking::STATUS_RIDE_COMPLETED]])
+                            ->andWhere(new \yii\db\Expression(self::closedForDriverSql()))
                             ->andWhere(['booking.driver_id' => $user_id]);
                         }
                         else {
@@ -2294,7 +2399,18 @@ public function actionApplyReferral()
                     $list = [];
 
                     foreach ($dataProvider->getModels() as $booking) {
-                        $list[] = $booking->asJson($user_id);
+                        $row = $booking->asJson($user_id);
+                        // Say who cancelled. A ride this driver cancelled is back in the pool with another status, so it is shown to
+                        // this driver as cancelled (the card and the details follow the status).
+                        $ownOffer = (int) (new \yii\db\Query())->select('status')->from('driver_requests')
+                            ->where(['booking_id' => $booking->id, 'driver_id' => $user_id])->scalar();
+                        if ($ownOffer === Booking::STATUS_DRIVER_CANCELLED) {
+                            $row['status'] = Booking::STATUS_DRIVER_CANCELLED;
+                            $row['cancelled_by'] = 'driver';
+                        } elseif ((int) $booking->status === Booking::STATUS_USER_CANCELLED) {
+                            $row['cancelled_by'] = 'customer';
+                        }
+                        $list[] = $row;
                     }
                     if (!empty($list)) {
                         $data['status'] = self::API_OK;
@@ -2362,6 +2478,13 @@ public function actionApplyReferral()
                     $booking = Booking::find()->where(['id' => $booking_id])->andWhere(['status' => Booking::STATUS_WAITING_FOR_DRIVER])
                         ->one();
                     if (!empty($booking)) {
+                        // PHOTO RULE: a driver must have a profile photo before accepting a ride (the customer sees it on the driver card).
+                        if (trim((string) $model->profile_image) === '') {
+                            $data['status'] = self::API_NOK;
+                            $data['error'] = 'Please add your profile photo before accepting rides. Open Profile and add a clear photo of yourself.';
+                            $data['details'] = $data['error'];
+                            return $this->sendJsonResponse($data);
+                        }
                         // WALLET RULE: the commission of cash rides is taken from the driver's wallet, so the wallet must hold at least the
                         // minimum set in Web Settings (driver_min_wallet_bal).
                         $availableBalance = DriverWallet::availableBalance($user_id, \app\modules\geo\services\ServiceModules::DRIVER);
@@ -2386,6 +2509,18 @@ if($availableBalance >= $driver_min_wallet_bal) {
         $data['details'] = "You already having ongoing ride. You are not allowed to accept now";
          return $this->sendJsonResponse($data);
 
+    }
+    // RATING IS COMPULSORY: a completed ride must be paid (collect-cash) and the customer rated (stars and a review) before the next ride.
+    $openCompleted = Booking::find()->select('id')
+        ->where(['driver_id' => $user_id, 'status' => Booking::STATUS_RIDE_COMPLETED])
+        ->andWhere('NOT (' . self::closedForDriverSql() . ')')
+        ->orderBy(['id' => SORT_DESC])
+        ->scalar();
+    if ($openCompleted) {
+        $data['status'] = self::API_NOK;
+        $data['details'] = 'Please collect the payment and rate the customer for booking #' . $openCompleted . ' before accepting a new ride.';
+        $data['error'] = $data['details'];
+        return $this->sendJsonResponse($data);
     }
     // Claim the booking with ONE conditional update. Two drivers tapping Accept at the same moment both pass the
     // "still waiting" check above, but only one of them changes a row here; the other gets 0 and is refused below.
@@ -2420,7 +2555,7 @@ if($availableBalance >= $driver_min_wallet_bal) {
         }
 
         $title = 'Booking  Accepted';
-        $body = 'Your Booking  Accepted booking id #' .$booking->id;
+        $body = 'Your booking was accepted. Booking ID #' .$booking->id;
         $booking->id;
         Yii::$app->push->notifyUser($booking->id, $booking->user_id, $title, $body);
         // History line shown on the booking page in the dashboard.
@@ -2670,8 +2805,8 @@ if($availableBalance >= $driver_min_wallet_bal) {
                                 $driver_requests->save(false);
                             }
 
-                            $title = 'Booking  status updated';
-                            $body = 'Booking  status updated status go for pickup booking id #' .$booking->id;
+                            $title = 'Driver on the way';
+                            $body = 'Your driver is on the way to the pickup point. Booking ID #' .$booking->id;
                             $booking->id;
                             Yii::$app->push->notifyUser($booking->id,$booking->user_id,$title,$body);
 
@@ -2843,12 +2978,12 @@ if($availableBalance >= $driver_min_wallet_bal) {
                                 }
 
                             $title = 'OTP verified';
-                            $body = 'OTP verified successfully for booking id #' .$booking->id;
+                            $body = 'OTP verified successfully. Booking ID #' .$booking->id;
                             $booking->id;
                             Yii::$app->push->notifyUser($booking->id,$booking->user_id,$title,$body);
 
                              $title = 'OTP verified';
-                            $body = 'OTP verified successfully for booking id #' .$booking->id;
+                            $body = 'OTP verified successfully. Booking ID #' .$booking->id;
                             $notification  =   Yii::$app->push->notifyUser($booking->id,$booking->driver_id,$title,$body);
 
                             // History line for the dashboard.
@@ -2900,6 +3035,185 @@ if($availableBalance >= $driver_min_wallet_bal) {
     }
     // [doc:end] actionArrivedLocation
 
+    /**
+     * Called with every position the Partner app reports (about every 20 s while the driver is online). When this driver has an
+     * in-city ride in progress and has been beyond the admin's in-city radius around the pickup point on two positions in a row
+     * (so one GPS blip does nothing), the customer gets a push notification and an entry in their in-app notification list,
+     * the driver gets a push, and the booking log gets a note. It happens once per ride (`radius_alert_at`). The fare is
+     * changed to outstation when the ride is completed (see settleRadiusCrossing), not here.
+     */
+    private function alertIfRadiusCrossed($driver, $previousLat, $previousLng, $lat, $lng)
+    {
+        try {
+            $radiusKm = Booking::incityRadiusKm();
+            $booking = Booking::find()
+                ->where(['driver_id' => $driver->id, 'status' => Booking::STATUS_START_RIDE, 'trip_type' => Booking::TRIP_TYPE_INTERCITY])
+                ->andWhere(['radius_alert_at' => null])
+                ->one();
+            if (empty($booking) || !is_numeric($booking->pickup_latitude) || !is_numeric($booking->pickup_longitude)) {
+                return;
+            }
+            $polygon = Booking::serviceAreaPolygon($booking->city_id);
+            // beyond the in-city area: outside the city's map, or (when the admin set a radius) farther than the radius from the pickup
+            $beyond = function ($pointLat, $pointLng) use ($booking, $radiusKm, $polygon) {
+                if (!is_numeric($pointLat) || !is_numeric($pointLng)) {
+                    return false;
+                }
+
+                return Booking::outsideServiceArea($pointLat, $pointLng, $polygon)
+                    || ($radiusKm > 0 && Booking::kmBetween($booking->pickup_latitude, $booking->pickup_longitude, $pointLat, $pointLng) > $radiusKm);
+            };
+            if (!$beyond($lat, $lng) || !$beyond($previousLat, $previousLng)) {
+                return;
+            }
+            // Only the first position pair that qualifies sends the alert, even when two reports arrive together.
+            $claimed = Booking::updateAll(['radius_alert_at' => date('Y-m-d H:i:s')], ['id' => $booking->id, 'radius_alert_at' => null]);
+            if (!$claimed) {
+                return;
+            }
+            Yii::$app->push->notifyUser($booking->id, $booking->user_id, 'Outstation limit crossed',
+                'Your trip has left the in-city area. The fare will be charged as an outstation trip. Booking ID #' . $booking->id);
+            Yii::$app->push->notifyDriver($booking->id, $driver->id, 'Outstation limit crossed',
+                'You have left the in-city area. This ride will be charged as an outstation trip. Booking ID #' . $booking->id);
+            $log = new BookingLogs();
+            $log->booking_id = $booking->id;
+            $log->description = 'Ride left the in-city area (outside the city map or beyond the in-city radius): customer and driver were alerted';
+            $log->status = BookingLogs::STATUS_ACTIVE;
+            $log->save(false);
+        } catch (\Throwable $e) {
+            Yii::error('radius alert failed for driver ' . $driver->id . ': ' . $e->getMessage(), 'booking');
+        }
+    }
+
+    /**
+     * Called when a ride is completed. Measures, from the driver's route log and the final drop, how far from the booked pickup point
+     * the ride went (maxKm) and how far from it the ride ended (endKm), saves the route in booking_route_log, and settles two things:
+     *  1. ONE WAY OR ROUND TRIP: a one-way booking that went out and ended back at the pickup is billed as a round trip; a round trip
+     *     that ended far from the pickup is billed as one way (Booking::actualRideType). Only when the city has a fare for the other type.
+     *  2. IN-CITY OR OUTSTATION: when the admin has set an in-city radius and an in-city ride went beyond it, it is billed as outstation.
+     * The booking's rider_type / trip_type are changed before the final fare is worked out, so the bill follows what was driven.
+     * Anything that cannot be priced (no fare card) leaves the booking as booked and says so in the booking log.
+     *
+     * @param array $points the driver's route: a list of points with lat and lng
+     * @param float|null $trackMaxKm the farthest the server's tracker saw the ride from the pickup, when it tracked this ride
+     * @param int|null $trackOutside how many tracked points were outside the city's map, when the server tracked this ride
+     */
+    private function settleRadiusCrossing($booking, array $points, $dropLat, $dropLng, $finalDistance, $trackMaxKm = null, $trackOutside = null)
+    {
+        if (!is_numeric($booking->pickup_latitude) || !is_numeric($booking->pickup_longitude)) {
+            return;
+        }
+        try {
+            $radiusKm = Booking::incityRadiusKm();
+            $maxKm = 0.0;
+            $endKm = null;
+            $used = [];
+            foreach ($points as $point) {
+                if (!is_array($point) || !isset($point['lat'], $point['lng']) || !is_numeric($point['lat']) || !is_numeric($point['lng'])) {
+                    continue;
+                }
+                $used[] = ['lat' => (float) $point['lat'], 'lng' => (float) $point['lng']];
+                $km = Booking::kmBetween($booking->pickup_latitude, $booking->pickup_longitude, $point['lat'], $point['lng']);
+                $maxKm = max($maxKm, $km);
+                $endKm = $km; // the last point of the route is where the ride ended, unless the final drop says otherwise
+            }
+            if (is_numeric($dropLat) && is_numeric($dropLng)) {
+                $used[] = ['lat' => (float) $dropLat, 'lng' => (float) $dropLng];
+                $endKm = Booking::kmBetween($booking->pickup_latitude, $booking->pickup_longitude, $dropLat, $dropLng);
+                $maxKm = max($maxKm, $endKm);
+            }
+            if ($endKm === null) {
+                return; // no route and no final drop: nothing to judge
+            }
+            // The server's own running maximum (every tracked position, not a thinned list) is the exact farthest point.
+            if ($trackMaxKm !== null) {
+                $maxKm = max($maxKm, (float) $trackMaxKm);
+            }
+            $notes = [];
+
+            // 1. one way or round trip
+            $bookedRide = (int) $booking->rider_type;
+            $billedRide = Booking::actualRideType($bookedRide, $maxKm, $endKm);
+            if ($billedRide !== $bookedRide) {
+                $hasCard = \app\modules\admin\models\CityRateCard::find()
+                    ->where(['city_id' => $booking->city_id, 'ride_type' => $billedRide, 'trip_type' => $booking->trip_type])->exists();
+                if ($hasCard) {
+                    $booking->rider_type = $billedRide;
+                    $notes[] = 'Ride ' . ($billedRide === Booking::RIDER_TYPE_ROUNDTRIP
+                        ? 'went ' . round($maxKm, 1) . ' km out and came back to the pickup point'
+                        : 'ended ' . round($endKm, 1) . ' km from the pickup point and did not come back')
+                        . ': booked as ' . ($bookedRide === Booking::RIDER_TYPE_ONEWAY ? 'one way' : 'a round trip')
+                        . ', billed as ' . ($billedRide === Booking::RIDER_TYPE_ONEWAY ? 'one way' : 'a round trip');
+                } else {
+                    $billedRide = $bookedRide;
+                    $notes[] = 'Ride looks like the other ride type, but no fare is set up for it in this city, so the booked type was kept (needs review)';
+                }
+            }
+
+            // 2. in-city or outstation: in-city is inside the city's map. The ride is outstation if any point of it was outside the map
+            // (the server's own count when it tracked the ride, else the uploaded route and the final drop), or if the admin's optional
+            // in-city radius was exceeded.
+            $polygon = Booking::serviceAreaPolygon($booking->city_id);
+            $outsideMap = false;
+            if ($trackOutside !== null) {
+                $outsideMap = (int) $trackOutside > 0;
+            } else {
+                foreach ($used as $u) {
+                    if (Booking::outsideServiceArea($u['lat'], $u['lng'], $polygon)) {
+                        $outsideMap = true;
+                        break;
+                    }
+                }
+            }
+            $crossed = $outsideMap || ($radiusKm > 0 && $maxKm > $radiusKm);
+            $radiusConverted = false;
+            if ($crossed && $booking->trip_type == Booking::TRIP_TYPE_INTERCITY) {
+                $booking->trip_type = Booking::TRIP_TYPE_OUTSTATION;
+                // One way: the outstation fare uses the real distance. Round trip: it uses the real hours. A round trip that goes
+                // out of town and comes back ends at the pickup, so the route log is the only proof it ever left the radius.
+                $outstation = $booking->rider_type == Booking::RIDER_TYPE_ROUNDTRIP
+                    ? $booking->calculateOutstationRoundTripEstimate()
+                    : $booking->calculateOutstationOneWayEstimate('true', $finalDistance);
+                if (!is_array($outstation)) {
+                    // No outstation fare for this city: keep the in-city fare and leave a note for the admin.
+                    $booking->trip_type = Booking::TRIP_TYPE_INTERCITY;
+                    $notes[] = 'Ride left the in-city area (farthest point ' . round($maxKm, 1)
+                        . ' km from the pickup); no outstation fare is set up for this city, so the in-city fare was kept (needs review)';
+                } else {
+                    $radiusConverted = true;
+                    $notes[] = 'Ride left the in-city area (the city map' . ($radiusKm > 0 && $maxKm > $radiusKm ? ' or the ' . round($radiusKm, 1) . ' km radius' : '')
+                        . '; farthest point ' . round($maxKm, 1) . ' km from the pickup): converted to an outstation ride';
+                }
+            }
+
+            Yii::$app->db->createCommand()->insert('booking_route_log', [
+                'booking_id' => $booking->id,
+                'driver_id' => $booking->driver_id,
+                'radius_km' => $radiusKm,
+                'max_km_from_pickup' => round($maxKm, 2),
+                'end_km_from_pickup' => round($endKm, 2),
+                'crossed' => $crossed ? 1 : 0,
+                'converted' => ($radiusConverted || $billedRide !== $bookedRide) ? 1 : 0,
+                'radius_converted' => $radiusConverted ? 1 : 0,
+                'ride_type_from' => $bookedRide,
+                'ride_type_to' => $billedRide,
+                'point_count' => count($used),
+                'route' => json_encode(array_slice($used, 0, 5000)),
+                'created_on' => date('Y-m-d H:i:s'),
+            ])->execute();
+
+            foreach ($notes as $note) {
+                $log = new BookingLogs();
+                $log->booking_id = $booking->id;
+                $log->description = $note;
+                $log->status = BookingLogs::STATUS_ACTIVE;
+                $log->save(false);
+            }
+        } catch (\Throwable $e) {
+            Yii::error('route check failed for booking ' . $booking->id . ': ' . $e->getMessage(), 'booking');
+        }
+    }
+
     // [doc:start] actionCompleteRide - /api/driver/complete-ride - The driver ends the trip: distance and time are measured, the final fare is calculated and the money is recorded.
     /**
      * The driver ends the trip: distance and time are measured, the final fare is calculated and the money is recorded.
@@ -2944,46 +3258,39 @@ if($availableBalance >= $driver_min_wallet_bal) {
                     // Only the assigned driver, and only a ride that has started, can be completed.
                     $booking = $this->ownedBooking($booking_id, $user_id, [Booking::STATUS_START_RIDE]);
                     if (!empty($booking)) {
-                        // 1. DISTANCE: sum of the legs of the route the phone recorded; if none was sent, the straight pickup-to-drop driving distance from Google.
-                        if(!empty($lat_long_route_map) && $lat_long_route_map!= "null"){
-
-                            $lat_long_route_map_decoded =  json_decode($lat_long_route_map,true);
-
-                            $coordinates = $lat_long_route_map_decoded;
-                            $data['test'] = count($coordinates);
-                            if(count($coordinates)> 0 ){
-                            $finalDistance = 0;
-                            // Calculate the total distance traveled and time taken
-                             for ($i = 0; $i < count($coordinates) - 1; $i++) {
-                             $lat1 = $coordinates[$i]['lat'];
-                             $lng1 = $coordinates[$i]['lng'];
-                             $lat2 = $coordinates[$i + 1]['lat'];
-                             $lng2 = $coordinates[$i + 1]['lng'];
-
-                             $distance = $driving_distance->getDrivingDistance($lat1, $lng1, $lat2, $lng2);
-                             $km = round($distance['meters']/1000,2);
-
-                             $finalDistance =  $finalDistance + $km;
-                            }
-
-                             }else{
-                                 $finalDistance = $driving_distance->getDrivingDistanceGoogleMap(
-                            $booking->final_pickup_latitude,
-                            $booking->final_pickup_longitude,
-                            $final_drop_latitude,
-                            $final_drop_longitude
-                        );
-                         $finalDistance =   $finalDistance['meters']/1000;
-                             }
-                        }else{
-                            $finalDistance = $driving_distance->getDrivingDistanceGoogleMap(
-                            $booking->final_pickup_latitude,
-                            $booking->final_pickup_longitude,
-                            $final_drop_latitude,
-                            $final_drop_longitude
-                        );
-                         $finalDistance =   $finalDistance['meters']/1000;
+                        // 1. DISTANCE, from what actually happened. In order of trust:
+                        //   a) the distance the server added up position by position while the ride ran (Booking::trackedDistance),
+                        //      closed at the final drop and with the long no-signal stretches re-measured on the road;
+                        //   b) the route the phone uploaded, measured along its points (no road lookup per leg, so a long route is
+                        //      fast and cannot time out);
+                        //   c) only if neither exists, the road distance from the pickup to the final drop.
+                        $coordinates = [];
+                        $trackMaxKm = null;
+                        $trackOutside = null;
+                        $tracked = Booking::trackedDistance($booking->id, $final_drop_latitude, $final_drop_longitude);
+                        $uploadedRoute = !empty($lat_long_route_map) && $lat_long_route_map != 'null' ? json_decode($lat_long_route_map, true) : null;
+                        if (!is_array($uploadedRoute)) {
+                            $uploadedRoute = [];
                         }
+                        if ($tracked !== null) {
+                            $finalDistance = $tracked['km'];
+                            $coordinates = $tracked['points'];
+                            $trackMaxKm = $tracked['max_km_from_pickup'];
+                            $trackOutside = $tracked['outside_points'];
+                        } elseif (count($uploadedRoute) > 1) {
+                            $coordinates = $uploadedRoute;
+                            $finalDistance = round(Booking::routeDistanceKm($coordinates), 2);
+                        } else {
+                            $coordinates = [];
+                            $finalDistance = $driving_distance->getDrivingDistanceGoogleMap(
+                                $booking->final_pickup_latitude,
+                                $booking->final_pickup_longitude,
+                                $final_drop_latitude,
+                                $final_drop_longitude
+                            );
+                            $finalDistance = $finalDistance['meters'] / 1000;
+                        }
+                        $data['test'] = count($coordinates);
 
                          Yii::info($finalDistance, 'postData');
 
@@ -3015,6 +3322,12 @@ if($availableBalance >= $driver_min_wallet_bal) {
                         // Calculate estimate based on rider_type and trip_type
                         // Calculate estimate based on rider_type and trip_type
                         // 4. FINAL FARE: the same fare formula as the estimate, run again with the real distance/time, per ride type.
+                        // IN-CITY RADIUS: a ride that travelled beyond the admin's radius around the pickup point is an outstation ride.
+                        // The proof is the driver's own route log (the positions the Partner app recorded during the ride) and the
+                        // final drop point; the log is kept with the booking.
+                        $this->settleRadiusCrossing($booking, isset($coordinates) && is_array($coordinates) ? $coordinates : [],
+                            $final_drop_latitude, $final_drop_longitude, $finalDistance, $trackMaxKm, $trackOutside);
+
                         if ($booking->rider_type == Booking::RIDER_TYPE_ONEWAY && $booking->trip_type == Booking::TRIP_TYPE_INTERCITY) {
                             $estimate = $booking->calculateIntercityOneWayEstimate('true',$finalDistance);
                         } elseif (
@@ -3138,7 +3451,7 @@ if (!empty($driver_requests)) {
 
                         // 8. Tell the customer, and add the history line.
                         $title = 'Ride completed';
-                        $body = 'Ride completed  booking id #' .$booking->id;
+                        $body = 'Your ride is complete. Please pay the driver and rate the ride. Booking ID #' .$booking->id;
                         $booking->id;
                         Yii::$app->push->notifyUser($booking->id,$booking->user_id,$title,$body);
 
@@ -3329,9 +3642,13 @@ $driverCancelDuplicate->booking_id = $booking->id; // Add this line
                     ? $post['booking_id']
                     : '';
                 $rating = !empty($post['rating']) ? $post['rating'] : '';
-                $review = !empty($post['review']) ? $post['review'] : '';
+                $review = !empty($post['review']) ? trim($post['review']) : '';
 
-                if (!empty($booking_id)) {
+                if (!empty($booking_id) && (!is_numeric($rating) || $rating < 1 || $rating > 5 || $review === '')) {
+                    // RATING IS COMPULSORY: stars (1-5) and a written review.
+                    $data['status'] = self::API_NOK;
+                    $data['error'] = 'Please give a rating and write a review.';
+                } elseif (!empty($booking_id)) {
                     // Only the booking's own driver may rate it.
                     $booking = Booking::find()->where(['id' => $booking_id, 'driver_id' => $user_id])->one();
                     if (!empty($booking)) {
@@ -3604,11 +3921,11 @@ $driverCancelDuplicate->booking_id = $booking->id; // Add this line
                             if (!empty($driver_requests)) {
 
                             $title = 'Ride Started';
-                            $body = 'Your Rude start successfully. booking id #'.$booking->id;
+                            $body = 'Ride started successfully. Booking ID #'.$booking->id;
                             $notification  =   Yii::$app->push->notifyUser($booking->id,$booking->driver_id,$title,$body);
 
                                   $title = 'Ride Started';
-                            $body = 'Rude start successfully. booking id #'.$booking->id;
+                            $body = 'Ride started successfully. Booking ID #'.$booking->id;
                             $notification  =   Yii::$app->push->notifyUser($booking->id,$booking->user_id,$title,$body);
 
                                 $driver_requests->status = $booking->status;

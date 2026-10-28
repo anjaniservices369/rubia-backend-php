@@ -123,6 +123,8 @@ class UserController extends BKController
                             'ride-request-cancelled',
                           	'cancellation-charges',
                            'current-city',
+                            'legal-page',
+                            'my-transactions',
                          
                         ],  
 
@@ -172,6 +174,8 @@ class UserController extends BKController
                             'ride-request-cancelled',
 							'cancellation-charges',
                            'current-city',
+                            'legal-page',
+                            'my-transactions',
                           
 
                         ],

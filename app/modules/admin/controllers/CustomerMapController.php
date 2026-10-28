@@ -34,7 +34,7 @@ class CustomerMapController extends Controller
     }
     // [doc:end] behaviors
 
-    // [doc:start] actionIndex - /admin/customer-map/index - Every customer who has a saved point, on one map.
+    // [doc:start] actionIndex - /admin/customer-map/index - Every customer who has a saved point, on one map. Same "stored the other way round" correction as the.
     /**
      * Every customer who has a saved point, on one map. Same "stored the other way round" correction as the
      * single-person map (India: latitude 6-37, longitude 68-98).

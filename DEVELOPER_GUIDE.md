@@ -348,3 +348,111 @@ After adding, moving or renaming a class run `php yii service/pack --all`.
 `customer/release`. `php yii service/pack --customer` (or `--all`) regenerates its class map. Do not put service logic in
 `UserAppActions`: a booking flow belongs to the service (`services/<service>/customer-backend`); `app/glue` is the only place
 where both are combined, for the shared process.
+
+## 12. Dispatch, trip rules and distance tracking (27 Oct 2026)
+
+Plain-language version: BUSINESS_GUIDE.md section 24. This is where the code is.
+
+**Dispatch** (`services/haltingdriver/customer-backend/controllers/UserController.php`)
+- `offerNewBookingNow()` runs after the customer's `get-estimate?saveBooking=true` reply has been sent (`Response::EVENT_AFTER_SEND`, so a
+  slow dispatch never delays or fails the booking). It and the cron entry `actionAssignBookingToDriver` both call
+  `offerBookingsToDrivers($bookings, $radiusKm, $deadline, &$summary)`: online, active drivers within `driverDispatchRadiusKm()`
+  (setting `driver_dispatch_radius`, 10 km), any city, not on a ride, not already holding an offer, nearest first.
+- Offers are one `batchInsert` into `driver_requests`; one `PushService::notifyDriversBatch()` -> `PushNotifier::sendBatch()` (one OneSignal
+  call per 1000 devices) with `type=newOrder`, which `PushNotifier::channel()` maps to the `new_booking_alert` Android channel.
+- Lesson: offers used to be created one driver at a time inside the booking request (a push each, about 2.5 s) and hit PHP's 30 s limit
+  after 9 drivers. Keep dispatch batched.
+- OneSignal answers HTTP 200 even when it delivered nothing; `PushNotifier::post()` now logs its `errors`/`warnings` as `push not delivered: ...`
+  (category `push`). `invalid_player_ids` plus "configure Android notifications" means the OneSignal app has no FCM credentials.
+
+**Pricing city, drop, trip type** (same controller, `actionGetEstimate`)
+- `pricingCity($lat, $lng, $requestedCityId)`: smallest `service_map` (module 1) polygon containing the pickup, **only among cities with
+  `city.status = 1` and at least one active `city_rate_card`** (in the dev data 176 of 257 maps belong to inactive cities or cities without fares,
+  e.g. a state-wide "Telangana New" outline and extra copies of "Hyderabad"; an earlier version ignored the status and priced Shamshabad from one of
+  them); else the city the app sent.
+  The booking's `city_id` is set to it, so every rate-card lookup in `Booking::calculate*Estimate()` (all filter on `$this->city_id`) uses the pickup's city.
+- A one-way booking without a drop is refused ("Please choose a drop location for a one-way trip.").
+- In-city means inside the city's map. (A map is made from pincodes in the dashboard - `MapDesigner` / `PincodeAreas` - and the outline they produce
+  is `service_map.boundary` / `city.boundary`; the check below reads that outline, it does not look pincodes up.) For an in-city booking the controller checks the pickup (and, one way, the drop) with
+  `dropInsideServiceArea()` -> `Booking::outsideServiceArea($lat, $lng, Booking::serviceAreaPolygon($cityId))` (ray casting plus the
+  `incity_boundary_buffer_km` distance to the edge, default 0); outside => `trip_type = OUTSTATION` and a `trip_notice` saying which. The admin's
+  optional `Booking::incityRadiusKm()` is an extra cap: a one-way drop farther than it from the pickup is outstation too. A city without a
+  map is never sent to outstation. The reply carries `trip_type`, `trip_type_changed`, `trip_notice`, `incity_radius_km`.
+
+**Real-time distance** (`services/haltingdriver/backend/models/Booking.php`, section "Real-time distance tracking")
+- `actionUpdateLatLng` calls `Booking::recordTrackForDriver()` for every reported position; `recordTrackPoint()` runs in one transaction with
+  the booking row locked (`SELECT ... FOR UPDATE`), applies the rules (constants `TRACK_*`: 60 m accuracy, 15 m drift, 180 km/h, 300 s gap,
+  road factor 1.3, 3 rejects in a row re-anchor), inserts `booking_track` and updates the running totals on `booking`
+  (`live_distance_km`, `track_points`, `track_gap_km`, `track_max_km`, `track_outside_points` = accepted points outside the city's map,
+  `track_last_*`). The first point is measured from `final_pickup_*` at `start_time`.
+- A gap is **time** passing without readings. Distance alone never makes a gap: a long step in a few seconds is a GPS error and is rejected
+  (an earlier version bridged it and added 60 km for a one-second spike; keep the order of the checks).
+- `actionCompleteRide`: distance = `Booking::trackedDistance()` (running total + last stretch to the final drop + `refineGaps()`: up to 20
+  biggest gaps re-measured with `DrivingDistance`, 20 s budget, answers outside 0.9x..3x of the straight line ignored) -> else
+  `Booking::routeDistanceKm()` over the uploaded route (no Google per leg) -> else pickup-to-drop road distance.
+  `trackedDistance()` thins the route in SQL (`MOD(id, step)`), about 300 points; the exact farthest point is `track_max_km`.
+- `Booking::liveTripSummary()` (added to `asJson`): `driver_latitude/longitude/position_at` while status 3-6, `live_distance_km` and
+  `ride_elapsed_min` while status 6.
+
+**Trip changes at the end** (`DriverController::settleRadiusCrossing`, called from `actionCompleteRide` before the final fare)
+- `Booking::actualRideType($booked, $maxKm, $endKm)` (tolerance `ride_return_tolerance_km`) decides one-way <-> round trip; in-city ->
+  outstation happens when `track_outside_points` > 0 or the final drop is outside the map (`trackedDistance()['outside_points']`; for an
+  untracked ride the uploaded route is tested point by point), or the optional radius was exceeded. `rider_type` / `trip_type` on the booking are changed before the fare is worked out. A change needs a
+  rate card for the new type, else it is skipped and noted. Result row in `booking_route_log`; `Booking::radiusSummary()` turns it into
+  `radius_converted`, `radius_note`, `route_points`, `max_km_from_pickup`, `incity_radius_km` on the booking details.
+- `alertIfRadiusCrossed()` (from `actionUpdateLatLng`): outside the city map or beyond the radius on two reports in a row => notify customer + driver once
+  (`booking.radius_alert_at` claimed with a conditional UPDATE, so concurrent reports cannot send it twice).
+
+**Lists and cancelling**
+- `actionBookings` (status 1) hides offers with `dr.status` rejected **or driver-cancelled** and adds `distance_to_pickup_km` / `eta_to_pickup_min`.
+- `actionBookingsHistory` status 11 (Cancelled) = rides this driver held that were cancelled by the customer (`booking.status` 8, `driver_id`
+  kept) or by this driver (`dr.status` 10, the booking is back in the pool); every row has `cancelled_by`.
+- Customer `cancel-ride`: a Waiting booking is cancelled free; an Accepted / On the way booking is cancelled with the cancellation charge (`cancel_ride_charges`,
+  the partner is credited charge minus the admin earning). Both mark every offer row user-cancelled.
+
+**Migrations.** Numbered SQL in `app/database/migrations` run by `php yii db/up --yes` (not `app/migrations/*.php`, which nothing runs):
+031 `page_app_key`, 032 `booking_route_log`, 033 `booking_radius_alert`, 034 `booking_live_track`. Each has a down script.
+
+**Fare notes.** Night fares add GST like day fares (the night branch of `calculateIntercityOneWayEstimate` used to leave it out of the total).
+The rate card has no car dimension, so car type / model never change the price.
+
+**Re-test after a change here (a simulated drive posts positions with `recorded_at` in the last hour):**
+10. Drift while parked, a duplicate reading, an inaccurate reading and a 60 km spike add nothing; a no-signal jump of 15 km adds 19.5 km, then
+    about the road distance after completion.
+11. A ride that leaves the city's map (even if it stays inside the radius) is billed outstation with no route uploaded; the customer gets
+    the alert after two outside reports; a one-way that returns to the pickup is billed round trip; a
+    round trip that ends 6 km away is billed one way; a ride that ends 1.5 km from the pickup stays as booked.
+12. Two customers book at the same moment; two accepts of one booking at once -> one wins.
+13. Customer cancels an accepted ride -> it is in the driver's Cancelled list; driver cancels -> it is offered to others, not back to that driver.
+14. 100,000 `booking_track` rows for one booking: the thinned read takes about 0.03 s.
+
+**Ola Maps (28 Oct 2026).** `OlaMapProvider` (`libs/platform/modules/geo/services/`) answers `geocode()` and `route()` for `MapProviders`; key `ola_maps_api_key`
+(Integrations, or the `OLA_MAPS_API_KEY` environment variable), base `OLA_MAPS_API_BASE` (tests). Directions: `POST /routing/v1/directions?origin=lat,lng&destination=lat,lng&api_key=`,
+distance read from `routes[0].legs[0].distance` (metres); Geocode: `GET /places/v1/geocode?address=&api_key=`. The request and response shapes were written from
+the provider's docs and a community client, and checked only against a local stand-in server: confirm them with a real key (Integrations > Maps and routes > Test).
+`DistanceUnavailableException` now has its own file (it used to sit in `DrivingDistance.php` and only existed once that file was loaded).
+
+**Outstation round trip (28 Oct 2026).** `Booking::calculateOutstationRoundTripEstimate($isFinal)` = `base_fare` + (`usage_hours` - `base_hour`)
+x 60 x `extra_min_charge` + `night_charge` x `nightsTouched()` + `out_station_charge`, then GST and fees. It returns `extraHours`, `extraHourRate` and
+`driverFoodStayNote` for the apps. `usage_hours` is the booked hours in the estimate and the real elapsed hours at completion. `get-estimate` accepts
+`usage_hours` up to 8760 (365 days).
+
+**End of a ride: payment, compulsory ratings, lists (28 Oct 2026).**
+- `UserController::actionAddReview` (customer) and `DriverController::actionAddReview` (driver) refuse a rating outside 1-5 or an empty review
+  ("Please give a rating and write a review."); the customer's one also requires the caller's own, completed booking.
+- `UserController::actionGetEstimate` (saveBooking=true): after the one-ride-at-a-time check, a completed, paid ride with no row in
+  `user_booking_ratings` refuses the new booking and returns `rate_booking_id`. `DriverController::actionAcceptRide`: a completed ride of
+  this driver that is not `closedForDriverSql()` (paid and a row in `driver_booking_ratings`) refuses the accept.
+- Lists: customer `BookingController::actionListBookings` - Active (status '') = in progress plus completed rides not `closedForCustomerSql()`;
+  Completed (7) = completed, paid, rated. Driver `DriverController::actionBookings` (Accepted, status 12) and `actionBookingsHistory`
+  (Completed, 7) use `closedForDriverSql()`. `payment_status` is 1 after `collect-cash`.
+
+**Maps from pincodes (migration 035).** `pincode_map (module, city_id, boundary, pincodes, pincode_count)` holds outlines drawn from pincodes and
+leaves `service_map` and `city.boundary` alone. `ServiceModules::boundary()` reads `pincode_map` first, then `service_map`, then `city.boundary`
+(so `Booking::serviceAreaPolygon`, the taxi code and `check-boundary` follow it); `UserController::pricingCity` lets a city's pincode map replace its
+hand-drawn one when judging the pickup. `PincodeAreas::lookup` asks OpenStreetMap (`fromOpenStreetMap`, 1 request a second) and then Google
+(`fromGoogle`); `forPincodes()` builds the outline for a list; `savePincodeMap()` stores it. The City maps page (`ServiceMapController::actionMap`)
+saves with `savePincodeMap` and has a "Remove the pincode map" button.
+
+## 13. Account deletion
+`app/components/AccountDeletion.php` (`blocker`, `deleteUser`, `logWebRequest`); endpoints `POST api/user/delete-account` and `POST api/driver/delete-account` (auth_code header); public page `GET/POST /account-deletion` (`SiteController::actionAccountDeletion`, view `views/site/account-deletion.php`); table `account_deletion_request` (migration 036). `deleteUser` sets `status = 2`, blanks the personal columns, deletes sessions, saved places and emergency contacts, and refuses while a booking is in status 2, 4, 5 or 6. Web requests are only logged for support to process (nobody is signed in on that page).

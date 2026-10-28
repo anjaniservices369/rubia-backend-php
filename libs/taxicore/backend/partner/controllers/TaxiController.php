@@ -98,6 +98,7 @@ class TaxiController extends BKController
                             'index',
                             'my-profile',
                             'send-otp',
+                            'legal-page',
                             'verify-otp',
                             'resend-otp',
                             'update-profile',
@@ -163,6 +164,7 @@ class TaxiController extends BKController
                             'check',
                             'index',
                             'send-otp',
+                            'legal-page',
                             'resend-otp',
                             'verify-otp',
                             'my-profile', 'generate-payment-token',
@@ -305,6 +307,29 @@ class TaxiController extends BKController
         return $this->sendJsonResponse($data);
     }
     // [doc:end] actionCheck
+
+    // [doc:start] actionLegalPage - GET /api/car/legal-page?type=terms|privacy|refund (also /api/auto/... and /api/bike/...; no login).
+    /**
+     * GET /api/car/legal-page?type=terms|privacy|refund   (also /api/auto/... and /api/bike/...; no login)
+     * Each taxi service has its own pages (app = Car / Auto / Bike taxi partner app); the service is the
+     * module this request came through.
+     */
+    public function actionLegalPage()
+    {
+        $apps = [
+            'cartaxidriver' => \app\modules\admin\models\Page::APP_CAR_TAXI,
+            'autotaxidriver' => \app\modules\admin\models\Page::APP_AUTO_TAXI,
+            'biketaxidriver' => \app\modules\admin\models\Page::APP_BIKE_TAXI,
+        ];
+        $moduleId = $this->module ? $this->module->id : '';
+        if (!isset($apps[$moduleId])) {
+            return $this->sendJsonResponse(['status' => 'NOK', 'error' => Yii::t('app', 'Unknown app')]);
+        }
+        return $this->sendJsonResponse(
+            \app\modules\admin\models\LegalPageApi::response($apps[$moduleId], Yii::$app->request->get('type'))
+        );
+    }
+    // [doc:end] actionLegalPage
 
     // [doc:start] actionSendOtp - Send Otp
     public function actionSendOtp()

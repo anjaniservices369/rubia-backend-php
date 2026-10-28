@@ -161,6 +161,10 @@ Dashboard → **Web Settings**. Changes apply straight away.
 | Taxi CGST / SGST (%) | GST on taxi rides (the halting drivers service uses the single GST setting above) | 2.5 / 2.5 |
 | Taxi dispatch mode | 1 = offer to one driver at a time, 2 = all nearby drivers at once, 3 = nearest group | 2 |
 | Taxi dispatch radius (km) / wait time (s) | How far from the pickup a taxi driver may be, and how long to wait before trying the next | 10 / 30 |
+| Booking radius (km) | Integrations > Driver settings. A new booking is shown to every online partner within this many km of the customer's pickup point (24.1) | 10 |
+| In-city trip radius (km) | Integrations > Customer settings. An optional extra limit: an in-city trip that goes farther than this from the pickup is billed as outstation even inside the city map (24.3). 0 = off: only the city map decides | not set |
+| In-city boundary buffer (km) | Integrations > Customer settings. How far outside the city map a pickup, drop or ride may be and still count as in-city. 0 = the map is exact | 0 |
+| Return-to-pickup tolerance (km) | Integrations > Customer settings. How close to the pickup a ride must end to count as having come back (24.4) | 1 |
 | Booking expiry grace (minutes, optional) | Minutes after the pickup time before an unanswered booking is cancelled. Not set = 0 | - |
 
 Keep keys private. The dashboard shows only the last characters of the push key after saving.
@@ -318,6 +322,9 @@ that is out for three days and nights pays it three times. A ride that starts at
 that ends before 22:00 pays nothing. The quote shows how many nights are charged and the charge per night; the final fare at
 the end of the ride uses the real start and end time.
 
+A night fare carries GST exactly like a day fare (changed 27 Oct 2026: before that the quote showed the GST but left it out of the
+total, so a night booking was cheaper than the same day booking by the GST amount).
+
 ## 18. Joining fee, partner payments and onboarding
 
 A new partner (driver) finishes these steps in the app: profile, profile photo, driving licence, Aadhaar, PAN, emergency contacts, bank details, vehicle
@@ -382,3 +389,137 @@ app shows to the partner. The ticks at the top show which onboarding steps the p
 You no longer choose a partner's or customer's city. Type the full address and press Save: the system finds the place on the map and the city it lies in
 (Integrations > Google Maps must have its server key). The profile shows the city and a map ("Joined in"). A city franchise sees the partners of its own city
 in Drivers-profile and can open their profiles to look at them, but cannot change them. In the partner list you can filter by city.
+
+
+## 24. Who sees a booking, and how a trip that changes is billed (27 Oct 2026)
+
+### 24.1 Who is offered a booking
+- The moment a customer confirms a booking it is offered to **every online, active partner within the Booking radius of the pickup
+  point** (setting above, 10 km if not set), nearest first. A partner's own city does not matter. Partners who are on a ride are skipped.
+  All of them get one push notification, in a single call.
+- Once a minute the dispatch job (the `assign-booking-to-driver` cron in DEPLOY.md) looks again, so a partner who comes online or drives
+  into the radius later still gets the booking. It never offers the same partner twice.
+- The partner sees the booking in **Available rides** with "km from you | minutes to reach", worked out from where the partner is now
+  (straight line x 1.3 at 25 km/h, so it is an estimate). The **first partner to accept gets it**; for everyone else it disappears. A
+  partner who turned a booking down, or accepted it and then cancelled, is not offered it again.
+- If a customer books while no partner is online inside the radius, the booking waits; the next dispatch run reaches partners who come online.
+
+### 24.2 Where the price comes from, and the drop can be anywhere
+- The **pickup point** chooses the price: the smallest service map that contains it, and that city's rate card. Only maps of cities that are
+  switched on and have an active fare card count; maps of switched-off cities (old copies, a state-wide outline) are ignored, so a locality
+  is priced by its own city map and never by a bigger region around it. The customer app no longer
+  blocks a drop outside the city and a drop never changes the city. A pickup in a place with no fares gets "Fares are not set up for
+  this city and ride type yet".
+- A one-way booking needs a drop; a round trip has none. The customer is limited to one active ride at a time.
+
+### 24.3 In-city or outstation: in-city means inside the city's map
+A city's **map is made from its pincodes** (section 12: you add the pincodes of the city for the service, and "Use this as the service area" draws the
+outline from them). The outline is what the in-city check uses, so keep each city's pincodes correct: one pincode filed under the wrong city, or a
+whole state filed as one city, makes the outline wrong. A trip is in-city only while it stays inside the city's outline.
+- **When booking:** if the pickup or the drop (one way) is outside the map, the trip is priced as outstation and the customer is told why
+  before confirming ("Your drop is outside the Hyderabad city area. This trip is booked as an outstation trip and is priced as one.").
+  If you have also set an **In-city trip radius**, a drop farther than that from the pickup is outstation too, even inside the map.
+  A round trip has no drop, so only its pickup is checked at booking.
+- **During the ride:** the partner's phone reports its position. If it is outside the map (or beyond the radius, if set) on two reports in a
+  row (about 20-40 seconds), the customer gets a notification and an entry in the in-app notifications, the partner gets a message, and the
+  booking log gets a note. Once per ride.
+- **At the end:** if any tracked point of the ride, or its final drop, was outside the map (or beyond the radius), an in-city ride is billed
+  as outstation (one way: by the real distance; round trip: by the real hours), whatever was booked. If the city has no outstation fare the
+  in-city fare is kept and the booking log says "needs review".
+- A city with no drawn map cannot be checked, so nothing is sent to outstation for it. The pickup chooses the city (24.2); a pickup outside
+  every active city map is priced by the city the app sent and, being outside that city's map, is an outstation trip.
+
+### 24.4 One way or round trip - what was driven decides
+- Booked **one way**, but the ride went at least 2 km out and ended within the **Return-to-pickup tolerance** of the pickup: billed as a
+  **round trip**.
+- Booked **round trip**, but it ended farther than twice the tolerance (at least 2 km) from the pickup: billed as **one way**.
+- Anything in between is billed as booked. If the city has no fare for the other ride type the booking is kept as booked and flagged for review.
+- The bill and the booking details say what happened in words, with a map of the route ("Booked as a one-way trip. The ride went 20.6 km out
+  and came back to the pickup point, so it was billed as a round trip."). Both apps show it. The route and the figures are saved in the
+  `booking_route_log` table.
+- **The final fare can be lower or higher than the estimate** (a one-way outstation estimate of Rs 1995 became Rs 945 when the ride came
+  back, because the round-trip outstation card is cheaper). Open decision: do you want a floor such as "never below the booked fare"?
+
+### 24.5 How the distance of a ride is measured
+- While a ride is in progress the partner's phone takes a reading every 20 metres and sends one at most every 10 seconds, with its accuracy,
+  speed and the time of the reading, and the server adds up the distance itself. Denser reporting makes the distance more exact.
+  Ignored: readings the phone says are inaccurate (worse than 60 m), repeated or older readings, standing still (moves under 15 m, or half
+  the accuracy), and impossible jumps (faster than 180 km/h; the GPS error is not counted).
+- Minutes with no readings (tunnel, no signal) are bridged with the straight line x 1.3 and counted as "gap" distance. At the end the biggest
+  gaps are measured again along real roads, so a long drive is not guessed.
+- The bill uses this distance for the extra-km charge of one-way rides. A round trip is priced by time only (its rate card has no per-km
+  charge). If the server has fewer than 3 readings it falls back to the route the phone uploaded, then to the road distance pickup to drop.
+- Long rides: a ride of 10 days or 15,000 km produces about 100,000 stored points (a few MB). The farthest-from-pickup figure is kept as a
+  running maximum, so the radius and return checks stay exact however long the ride is.
+
+### 24.6 Cancelling
+- **The customer cancels** a booking that is still waiting: free, every offer is closed. **After a partner accepted** (accepted or on the
+  way): the customer is charged the *User cancellation charge* and the partner is credited that charge minus your *Admin cancellation
+  earnings* (200 - 100 = Rs 100 now). The ride leaves the
+  partner's Accepted rides and shows in the partner's **Cancelled** rides as "cancelled by the customer". If the partner is on the ride
+  screen at that moment the app tells them straight away.
+- **The partner cancels** after accepting: the partner is charged the *Driver cancellation charge* (Rs 500 now), the booking goes back to
+  Waiting for driver and is offered to the other partners (not to this one again), and the customer's card goes back to "Waiting for Driver".
+  The ride shows in the partner's **Cancelled** rides as "cancelled by you".
+
+### 24.7 What does not change the price (yet)
+Car type (automatic / manual) and car model (SUV+, SUV, Sedan, Hatchback) are saved on the booking and shown to the partner, but every
+combination costs the same: the rate card has no car dimension. If a model should cost more, new rate-card fields are needed.
+
+### 24.8 Maps drawn from pincodes (separate from the hand-drawn maps)
+- A city's map can be drawn from its pincodes (City maps page: add the pincodes, then **Save as the pincode map**). It is kept in its own
+  table (`pincode_map`) apart from the hand-drawn map, which is **not changed**. Booking and billing use the pincode map first; a city without
+  one keeps its hand-drawn map. **Remove the pincode map** on the same page goes back to the hand-drawn one.
+- Pincodes are looked up on OpenStreetMap first (free, no key); Google Geocoding is the backup. A pincode that neither finds is listed as
+  not found and does not widen the map; one far from the others is flagged and left out.
+- The map is the smallest convex outline around the pincodes' areas, so a place whose pincode is missing from the list (for example an airport
+  pincode) is outside the map until it is added.
+- Maps built this way (27 Oct 2026): Hyderabad, Bengaluru, Chennai, Cochin, Vijayawada, Mumbai, Delhi, Kolkata, Pune, Nagpur, Bhopal, Goa
+  (and the test cities Kanyakumari and Srinagar). A city that had no fares got a **copy of Hyderabad's fares** (Cochin, Kolkata, Mumbai, Pune,
+  Bhopal, Goa, Kanyakumari, Srinagar): edit them to each city's real rates before opening those cities to customers.
+
+### 24.9 The end of a ride: bill, payment, rating, Completed (28 Oct 2026)
+1. The driver completes the ride. **Both** the customer and the driver see the final bill. The ride stays in **Active** (customer) and
+   **Accepted rides** (driver), marked *Payment pending* / *Collect payment*.
+2. The driver collects the payment in the Partner app (**Collect cash**). The booking is then marked paid.
+3. **Rating and a written review are compulsory for both sides.** As soon as the payment is confirmed the customer's app opens a rating
+   sheet (stars and a review) and the driver's app opens one too. Neither sheet can be skipped, dragged away or closed with Back, and the
+   server refuses a rating without stars (1-5) or without text.
+4. A ride moves to **Completed** for a person when the ride is paid **and that person has rated**. The customer's and the driver's
+   Completed lists are separate: each moves when that person rates.
+5. **Nothing new can start until the last ride is rated.** A customer whose previous paid ride is unrated cannot book (the app says so and
+   opens the rating sheet for that ride). A driver whose completed ride is not yet paid and rated cannot accept another ride.
+- The rating card on the ride's details page is another way to give the same rating; it has the same rules.
+- Old paid rides that were never rated count too: the customer or driver is asked for those the first time they try to book or accept.
+
+### 24.10 Outstation round trip: priced by the hour (28 Oct 2026)
+- The rate card's **base fare covers the base hours of the first day only** (for example 4 hours). **Every hour after that is charged hourly** at
+  the rate card's extra rate (extra per minute x 60). There is no new base fare for later days.
+- The **night charge** is added for every night (22:00 to 06:00) the trip touches, plus the rate card's outstation charge, then GST.
+- The customer chooses the **trip length in hours** (up to 365 days = 8,760 hours; the app shows the same length in days). At the end of the ride
+  the real elapsed hours are billed the same way, so a trip that runs longer than booked simply costs more hours.
+- **The driver's food and accommodation are provided by the customer** during the trip and are not part of the fare. The estimate, the fare sheet
+  and the ride details say so.
+- **Base hours differ per trip type**: each rate card (in-city one-way, in-city round trip, outstation one-way, outstation round trip) has its own base
+  hours and base fare (for example 3 hours for outstation one-way and 4 hours for outstation round trip). The app starts an outstation trip at its own
+  base hours and the fare sheet quotes them.
+- Every other trip type is limited to a 12-hour booking (a driver's duty); anything longer is charged by the hour when the ride ends.
+- Example (base 900 for 4 hours, 60 per extra hour, 500 per night, GST 5%): a 38-hour trip with 2 nights = 900 + 34 x 60 + 2 x 500 = 3,940, plus
+  GST 197 = **4,137**.
+
+### 24.11 Map services: Ola Maps, Google, Mapbox, OpenStreetMap
+Road distances (estimates and bills) and the city-from-address lookup go to the map services in the order set in **Integrations > Maps and
+routes** (default: Ola Maps, Google, Mapbox, OpenStreetMap). A service with no key, or one that refuses, is skipped for the next, so a blocked
+Google key no longer stops bookings once another service has a key. **Ola Maps** needs one API key (Ola/Krutrim Maps console) with the Routing
+and Places APIs switched on. The maps *shown* in the apps still use the Google map key (a separate setting).
+
+### 24.12 Known limits
+- Push notifications reach a phone only when the OneSignal app has its **Android credentials** set up in the OneSignal dashboard. Until
+  then a partner hears about a new booking only while the Partner app is open (it checks every 10 seconds and plays the booking sound).
+- A partner whose phone sends no positions during the ride (app killed, no signal for hours) gets the straight-line estimate for that
+  stretch, flagged as gap distance on the booking.
+
+### 24.13 Account deletion (Google Play requirement)
+- **In the apps:** Profile → **Delete account** in both the customer app and the Partner app. It asks for confirmation, then deletes at once: the person is signed out everywhere and their name, email, phone number, photo, date of birth, emergency contacts, saved places and device tokens are erased. Ride, invoice and payment records stay, without the link to the person (tax and accounting rules). A person with a ride in progress must finish it first.
+- **On the web:** the public page `https://<your-domain>/account-deletion` (for people who no longer have the app). The form records a request (table `account_deletion_request`, `source = web`, `status = 0`); support calls the person back on the number to confirm and processes it within 30 days (the page says so).
+- **Play Console:** put the page address into *App content → Data safety → Account deletion link* for **both** apps (com.rubia.driver and the customer app), replacing the dead Google Form link, then resubmit.

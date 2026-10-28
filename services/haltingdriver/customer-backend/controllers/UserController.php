@@ -104,6 +104,7 @@ class UserController extends BKController
                             'resend-otp',
                             'index',
                             'update-profile',
+                            'delete-account',
                             'add-user-emergency-contacts',
                             'add-emergency-contact',
                             'update-emergency-contact',
@@ -140,6 +141,8 @@ class UserController extends BKController
                             'ride-request-cancelled',
                           	'cancellation-charges',
                            'current-city',
+                            'legal-page',
+                            'my-transactions',
                          
                         ],  
 
@@ -154,6 +157,7 @@ class UserController extends BKController
                             'resend-otp',
                             'index',
                             'update-profile',
+                            'delete-account',
                             'add-user-emergency-contacts',
                             'update-emergency-contact',
                             'list-emergency-contacts',
@@ -189,6 +193,8 @@ class UserController extends BKController
                             'ride-request-cancelled',
 							'cancellation-charges',
                            'current-city',
+                            'legal-page',
+                            'my-transactions',
                           
 
                         ],
@@ -302,12 +308,14 @@ class UserController extends BKController
                 $inputError = null;
                 if (!in_array((int) $model->car_type, [Booking::CAR_TYPE_AUTOMATIC, Booking::CAR_TYPE_MANUAL], true)) {
                     $inputError = 'Please choose a valid car type.';
-                } elseif (!is_numeric($model->usage_hours) || (float) $model->usage_hours < 0 || (float) $model->usage_hours > 168) {
+                } elseif (!is_numeric($model->usage_hours) || (float) $model->usage_hours < 0 || (float) $model->usage_hours > 8760) {
                     $inputError = 'Please choose a valid number of hours.';
-                } elseif (!($serviceCity = \app\modules\admin\models\City::findOne($model->city_id))) {
+                } elseif ($model->rider_type == Booking::RIDER_TYPE_ONEWAY
+                    && (!is_numeric($model->drop_latitude) || !is_numeric($model->drop_longitude))) {
+                    // A one-way trip needs a drop point to be priced; without one the distance step failed with a confusing message.
+                    $inputError = 'Please choose a drop location for a one-way trip.';
+                } elseif (!($serviceCity = $this->pricingCity($model->pickup_latitude, $model->pickup_longitude, $model->city_id))) {
                     $inputError = 'Service is not available in this city.';
-                } elseif (!$this->pickupInsideCity($serviceCity, $model->pickup_latitude, $model->pickup_longitude)) {
-                    $inputError = 'Sorry, we do not serve this pickup location yet.';
                 } elseif ($pickupAt === false || $pickupAt < time() - 300) {
                     $inputError = 'The pickup date and time must be in the future.';
                 }
@@ -315,6 +323,35 @@ class UserController extends BKController
                     $data['status'] = self::API_NOK;
                     $data['error'] = $inputError;
                     return $this->sendJsonResponse($data);
+                }
+
+                // The fare comes from the rate card of the map the customer books in, whatever city the app sent.
+                $model->city_id = $serviceCity->id;
+
+                // 2b. IN-CITY MEANS INSIDE THE CITY'S MAP. An in-city trip whose pickup or drop is outside the map of the price
+                // city is an outstation trip: it is priced as one and the customer is told why. When the admin has also set an
+                // "In-city trip radius", a drop farther than that from the pickup is outstation too. The customer can choose any
+                // drop; only the trip type changes.
+                $tripNotice = null;
+                if ((int) $model->trip_type === Booking::TRIP_TYPE_INTERCITY) {
+                    $hasDrop = $model->rider_type == Booking::RIDER_TYPE_ONEWAY
+                        && is_numeric($model->drop_latitude) && is_numeric($model->drop_longitude);
+                    $pickupLocal = $this->dropInsideServiceArea($serviceCity, (float) $model->pickup_latitude, (float) $model->pickup_longitude);
+                    $dropLocal = !$hasDrop || $this->dropInsideServiceArea($serviceCity, (float) $model->drop_latitude, (float) $model->drop_longitude);
+                    $radiusKm = Booking::incityRadiusKm();
+                    $dropKm = $hasDrop
+                        ? Booking::kmBetween($model->pickup_latitude, $model->pickup_longitude, $model->drop_latitude, $model->drop_longitude) : 0.0;
+                    if (!$pickupLocal || !$dropLocal || ($radiusKm > 0 && $dropKm > $radiusKm)) {
+                        $model->trip_type = Booking::TRIP_TYPE_OUTSTATION;
+                        if (!$pickupLocal) {
+                            $tripNotice = 'Your pickup is outside the ' . $serviceCity->name . ' city area.';
+                        } elseif (!$dropLocal) {
+                            $tripNotice = 'Your drop is outside the ' . $serviceCity->name . ' city area.';
+                        } else {
+                            $tripNotice = 'Your drop is ' . round($dropKm, 1) . ' km from the pickup, beyond the ' . round($radiusKm, 1) . ' km in-city limit.';
+                        }
+                        $tripNotice .= ' This trip is booked as an outstation trip and is priced as one.';
+                    }
                 }
 
                 // One ride at a time: a customer with a booking in process cannot book another.
@@ -338,6 +375,18 @@ class UserController extends BKController
                         $data['status'] = self::API_NOK;
                         $data['error'] = 'You already have a ride in progress. Please complete or cancel it before booking another.';
                         $data['active_booking_id'] = (int) $activeId;
+                        return $this->sendJsonResponse($data);
+                    }
+                    // RATING IS COMPULSORY: a ride that is completed and paid must be rated (stars and a review) before the next one.
+                    $unratedId = Booking::find()->select('id')
+                        ->where(['user_id' => $user_id, 'status' => Booking::STATUS_RIDE_COMPLETED, 'payment_status' => Booking::payment_status_success])
+                        ->andWhere('NOT EXISTS (SELECT 1 FROM user_booking_ratings ubr WHERE ubr.booking_id = booking.id)')
+                        ->orderBy(['id' => SORT_DESC])
+                        ->scalar();
+                    if ($unratedId) {
+                        $data['status'] = self::API_NOK;
+                        $data['error'] = 'Please rate your driver and write a review for your previous ride before booking another.';
+                        $data['rate_booking_id'] = (int) $unratedId;
                         return $this->sendJsonResponse($data);
                     }
                 }
@@ -432,6 +481,14 @@ class UserController extends BKController
                         
                         $data['coupon_discount'] = $model->coupon_discount;
                         $data['message'] = 'Booking estimate';
+                        // Tells the app which kind of trip this is and why it changed (shown to the customer before they confirm).
+                        $data['trip_type'] = (int) $model->trip_type;
+                        $data['trip_type_changed'] = $tripNotice !== null;
+                        // The in-city limit around the pickup point (0 = none), quoted in the fare details sheet.
+                        $data['incity_radius_km'] = Booking::incityRadiusKm();
+                        if ($tripNotice !== null) {
+                            $data['trip_notice'] = $tripNotice;
+                        }
                         //$data['cancellation_charges'] = $totalCancellationCharge;
 
                         if ($saveBooking) {
@@ -444,6 +501,18 @@ class UserController extends BKController
                                 $body = 'Now ride booked successfully. booking id #'.$model->id;
                                $notification  =   Yii::$app->push->notifyUser($model->id,$model->user_id,$title,$body);
                          
+
+                                // Offer it to the drivers in the radius right away, after the customer has been answered
+                                // (cron later reaches drivers who come online or move into the radius).
+                                $booking = $model;
+                                Yii::$app->response->on(\yii\web\Response::EVENT_AFTER_SEND, function () use ($booking) {
+                                    ignore_user_abort(true);
+                                    if (function_exists('fastcgi_finish_request')) {
+                                        fastcgi_finish_request();
+                                    }
+                                    @set_time_limit(60);
+                                    $this->offerNewBookingNow($booking);
+                                });
 
                                 $data['booking_id'] = $model->id;
                                 $data['message'] = 'Booking saved successfully';
@@ -477,19 +546,92 @@ class UserController extends BKController
 
   
     /**
-     * True when the point lies inside the city's drawn boundary. A city without a usable boundary does not block bookings.
+     * Customers can book anywhere; drivers are found by radius (see offerBookingsToDrivers), and only the PRICE depends
+     * on the map. The pickup point picks the map: the smallest service map that contains it. Only maps of cities that are
+     * switched on and have an active fare card count (maps of inactive cities, old copies or state-wide outlines never
+     * decide anything). A pickup outside every such map is priced by the city the app sent, so nobody is refused.
+     * Returns the City, or null when neither exists.
      */
-    private function pickupInsideCity($city, $lat, $lng)
+    private function pricingCity($lat, $lng, $requestedCityId)
     {
-        // The driver service has its own map of every city (service_map, module 1); without one the city's own
-        // boundary is used, as before. No usable outline = nobody is refused.
-        $polygon = \app\modules\geo\services\ServiceModules::boundary(\app\modules\geo\services\ServiceModules::DRIVER, $city->id);
-        if (empty($polygon)) {
-            return true;
+        $lat = (float) $lat;
+        $lng = (float) $lng;
+        $bestCityId = null;
+        $bestArea = INF;
+        // Only maps of cities that are switched on AND have an active fare card can price a booking (the same rule the customer app's
+        // pickup check uses). Maps of inactive cities (old copies, state-wide outlines) never decide anything.
+        $rows = (new \yii\db\Query())->select(['m.city_id', 'm.boundary'])->from(['m' => 'service_map'])
+            ->innerJoin(['c' => 'city'], 'c.id = m.city_id')
+            ->where(['m.module' => \app\modules\geo\services\ServiceModules::DRIVER, 'c.status' => \app\modules\admin\models\City::STATUS_ACTIVE])
+            ->andWhere('EXISTS (SELECT 1 FROM city_rate_card r WHERE r.city_id = c.id AND r.status = 1)')
+            ->all();
+        // a city with a map drawn from pincodes (pincode_map) is judged by that map, not by its hand-drawn one
+        $byCity = [];
+        foreach ($rows as $row) {
+            $byCity[(int) $row['city_id']] = $row['boundary'];
+        }
+        $pinRows = (new \yii\db\Query())->select(['m.city_id', 'm.boundary'])->from(['m' => 'pincode_map'])
+            ->innerJoin(['c' => 'city'], 'c.id = m.city_id')
+            ->where(['m.module' => \app\modules\geo\services\ServiceModules::DRIVER, 'c.status' => \app\modules\admin\models\City::STATUS_ACTIVE])
+            ->andWhere('EXISTS (SELECT 1 FROM city_rate_card r WHERE r.city_id = c.id AND r.status = 1)')
+            ->all();
+        foreach ($pinRows as $row) {
+            $byCity[(int) $row['city_id']] = $row['boundary'];
+        }
+        foreach ($byCity as $cityKey => $rawBoundary) {
+            $row = ['city_id' => $cityKey, 'boundary' => $rawBoundary];
+            $polygon = \app\modules\geo\services\ServiceModules::decode($row['boundary']);
+            if (!$polygon || !$this->isPointInsideBoundary($lat, $lng, $polygon)) {
+                continue;
+            }
+            $lats = array_column($polygon, 0);
+            $lngs = array_column($polygon, 1);
+            $area = (max($lats) - min($lats)) * (max($lngs) - min($lngs));
+            if ($area < $bestArea) {
+                $bestArea = $area;
+                $bestCityId = (int) $row['city_id'];
+            }
         }
 
-        return (bool) $this->isPointInsideBoundary($lat, $lng, $polygon);
+        return \app\modules\admin\models\City::findOne($bestCityId ?: (int) $requestedCityId);
     }
+
+    /**
+     * True when the point (a pickup or a drop) is inside the city's service map, or outside it by no more than the buffer set in the admin
+     * dashboard (Integrations > Customer settings > "In-city boundary buffer (km)", 0 when not set: the map is exact). A city without a
+     * usable map cannot be checked, so nothing is treated as outstation for it. The work is done by Booking::outsideServiceArea().
+     */
+    private function dropInsideServiceArea($city, $lat, $lng)
+    {
+        return !Booking::outsideServiceArea($lat, $lng, Booking::serviceAreaPolygon($city->id));
+    }
+
+    // [doc:start] actionDeleteAccount - Deletes the signed-in account (Google Play account deletion): signs out everywhere and erases the personal details; ride and.
+    /**
+     * Deletes the signed-in account (Google Play account deletion): signs out everywhere and erases the personal details; ride and
+     * payment records stay without the personal link. Refused while a ride is in progress.
+     */
+    public function actionDeleteAccount()
+    {
+        $data = [];
+        $headers = isset(\Yii::$app->request->headers['auth_code'])
+            ? \Yii::$app->request->headers['auth_code']
+            : Yii::$app->request->getQueryParam('auth_code');
+        $auth = new AuthSettings();
+        $user_id = $auth->getAuthSession($headers);
+        if (empty($user_id)) {
+            $data['status'] = self::API_NOK;
+            $data['error'] = Yii::t('app', 'You are not logged in');
+
+            return $this->sendJsonResponse($data);
+        }
+        [$ok, $message] = \app\components\AccountDeletion::deleteUser($user_id, User::ROLE_USER, 'app', (string) Yii::$app->request->post('reason', ''));
+        $data['status'] = $ok ? self::API_OK : self::API_NOK;
+        $data[$ok ? 'message' : 'error'] = Yii::t('app', $message);
+
+        return $this->sendJsonResponse($data);
+    }
+    // [doc:end] actionDeleteAccount
 
     // [doc:start] actionCheckBoundary - Check Boundary
     public function actionCheckBoundary()
@@ -520,8 +662,8 @@ class UserController extends BKController
               
                 foreach ($cities as $city) {
                    $data['postData'][] = $city->name; 
-                    $boundary = Json::decode($city->boundary);
-                    $polygonArray = json_decode($boundary, true);
+                    // the pincode map first, then the hand-drawn one (same order as everywhere else)
+                    $polygonArray = \app\modules\geo\services\ServiceModules::boundary(\app\modules\geo\services\ServiceModules::DRIVER, $city->id) ?: [];
                     // Check if pickup and drop points are inside the boundary
                     if (
                         $this->isPointInsideBoundary(
@@ -876,13 +1018,13 @@ class UserController extends BKController
      *  - only bookings created in the last 24 hours that are still waiting for a driver,
      *  - only online, active drivers of the booking's city, nearest to the pickup point first,
      *  - drivers on a ride or already holding a request for the booking are skipped,
-     *  - at most MAX_NEW_OFFERS_PER_BOOKING new offers per booking per run (the next run reaches the next nearest),
+     *  - only drivers within the admin-set radius of the pickup point (driver_dispatch_radius) are offered the booking,
      *  - stops after 40 seconds and reports what it did.
      * If a cron token is configured (CRON_TOKEN or secrets 'cronToken') the call must carry it as ?token=...
      */
     public function actionAssignBookingToDriver()
     {
-        $limit = 25; // MAX_NEW_OFFERS_PER_BOOKING
+        $radiusKm = $this->driverDispatchRadiusKm();
         $expected = getenv('CRON_TOKEN') ?: ((require \Yii::getAlias('@app/config/secrets-loader.php'))['cronToken'] ?? '');
         if ($expected !== '' && !hash_equals((string)$expected, (string)\Yii::$app->request->get('token', ''))) {
             \Yii::$app->response->statusCode = 403;
@@ -905,6 +1047,43 @@ class UserController extends BKController
             return $this->sendJsonResponse(['status' => self::API_OK, 'details' => $summary]);
         }
 
+        $this->offerBookingsToDrivers($bookings, $radiusKm, $deadline, $summary);
+        return $this->sendJsonResponse(['status' => self::API_OK, 'details' => $summary]);
+    }
+    // [doc:end] actionAssignBookingToDriver
+    /**
+     * Radius, in km, around the customer's pickup point. Every online driver inside it is offered the booking.
+     * Admin dashboard: Integrations > Driver settings > "Booking radius (km)" (setting "driver_dispatch_radius"); 10 when not set.
+     */
+    private function driverDispatchRadiusKm()
+    {
+        $value = (float) (new WebSetting())->getSettingBykey('driver_dispatch_radius');
+        return $value > 0 ? $value : 10.0;
+    }
+
+    /**
+     * Offers one booking to the nearest online drivers right after it is saved, so drivers hear about it at once
+     * and not at the next cron run. Never lets a dispatch problem fail the customer's booking.
+     */
+    private function offerNewBookingNow($booking)
+    {
+        try {
+            $summary = ['bookings' => 0, 'offers' => 0, 'stopped_early' => false];
+            $this->offerBookingsToDrivers([$booking], $this->driverDispatchRadiusKm(), microtime(true) + 10, $summary);
+        } catch (\Throwable $e) {
+            Yii::error('immediate dispatch failed for booking ' . $booking->id . ': ' . $e->getMessage(), 'push');
+        }
+    }
+
+    /**
+     * Offers each of $bookings to every driver within $radiusKm of its pickup point: online, active, any city, not on a
+     * ride and not already holding an offer for it. Nearest first. Used by the cron entry point (which also reaches drivers
+     * who came online or moved into the radius later) and by [[offerNewBookingNow]].
+     *
+     * @param array $summary counters filled in: bookings, offers, stopped_early
+     */
+    private function offerBookingsToDrivers(array $bookings, $radiusKm, $deadline, array &$summary)
+    {
         // WHICH DRIVERS: active, online drivers.
         $driverQuery = User::find()
             ->where(['status' => User::STATUS_ACTIVE, 'user_role' => User::ROLE_DRIVER, 'online_status' => User::online_status_yes]);
@@ -939,9 +1118,7 @@ class UserController extends BKController
                 if (isset($busy[$driver->id]) || isset($already[$driver->id])) {
                     continue;
                 }
-                if (!empty($booking->city_id) && !empty($driver->city_id) && (int)$driver->city_id !== (int)$booking->city_id) {
-                    continue;
-                }
+                // No city check: customers can book anywhere, so any driver within the radius may be offered the booking.
                 $km = 1e9;
                 if (is_numeric($driver->lat) && is_numeric($driver->lng) && (float)$driver->lat != 0.0
                     && is_numeric($booking->pickup_latitude) && is_numeric($booking->pickup_longitude)) {
@@ -953,24 +1130,41 @@ class UserController extends BKController
                 }
                 $candidates[] = [$km, $driver];
             }
-            // Nearest driver first (straight-line distance from the pickup).
+            // Only drivers inside the admin-set radius (a driver with no known position is never inside it), nearest first.
+            $candidates = array_filter($candidates, function ($c) use ($radiusKm) { return $c[0] <= $radiusKm; });
             usort($candidates, function ($a, $b) { return $a[0] <=> $b[0]; });
 
-            // OFFER: at most $limit new offers per booking per run; each one is a driver_requests row plus a push to the driver.
-            foreach (array_slice($candidates, 0, $limit) as $row) {
-                $request = new DriverRequests();
-                $request->driver_id = $row[1]->id;
-                $request->booking_id = $booking->id;
-                $request->status = $booking->status;
-                $request->save(false);
-                Yii::$app->push->notifyUser($booking->id, $request->driver_id, 'New Booking',
-                    'You have received a new ride. Booking ID #' . $booking->id);
-                $summary['offers']++;
+            // OFFER: one driver_requests row per driver (a single insert), then one push call tells all of them at once.
+            // $already was read at the top of this booking's turn, so a driver is never offered the same booking twice.
+            $offeredTo = [];
+            $rows = [];
+            $now = date('Y-m-d H:i:s');
+            // Cron and the new-booking dispatch can overlap: one fresh look for drivers offered in the meantime.
+            $taken = array_flip(DriverRequests::find()->select('driver_id')->where(['booking_id' => $booking->id])->column());
+            foreach ($candidates as $row) {
+                if (isset($taken[$row[1]->id])) {
+                    continue;
+                }
+                $offeredTo[] = $row[1]->id;
+                $rows[] = [$row[1]->id, $booking->id, $booking->status, $now, $now];
+            }
+            if ($rows) {
+                Yii::$app->db->createCommand()
+                    ->batchInsert(DriverRequests::tableName(), ['driver_id', 'booking_id', 'status', 'created_on', 'updated_on'], $rows)
+                    ->execute();
+                $summary['offers'] += count($rows);
+            }
+            if ($offeredTo) {
+                try {
+                    // type "newOrder": the Partner app rings noti6x for it (channel new_booking_alert), even when closed.
+                    Yii::$app->push->notifyDriversBatch($booking->id, $offeredTo, 'New Booking',
+                        'You have received a new ride. Booking ID #' . $booking->id, 'newOrder');
+                } catch (\Throwable $e) {
+                    Yii::error('new booking push failed for booking ' . $booking->id . ': ' . $e->getMessage(), 'push');
+                }
             }
         }
-        return $this->sendJsonResponse(['status' => self::API_OK, 'details' => $summary]);
     }
-    // [doc:end] actionAssignBookingToDriver
 
 
 
@@ -1327,11 +1521,19 @@ class UserController extends BKController
                     ? $post['booking_id']
                     : '';
                 $rating = !empty($post['rating']) ? $post['rating'] : '';
-                $review = !empty($post['review']) ? $post['review'] : '';
+                $review = !empty($post['review']) ? trim($post['review']) : '';
 
-                if (!empty($booking_id)) {
+                if (empty($booking_id)) {
+                    $data['status'] = self::API_NOK;
+                    $data['error'] = 'booking_id required';
+                } elseif (!is_numeric($rating) || $rating < 1 || $rating > 5 || $review === '') {
+                    // RATING IS COMPULSORY: stars (1-5) and a written review.
+                    $data['status'] = self::API_NOK;
+                    $data['error'] = 'Please give a rating and write a review.';
+                } else {
+                    // only the customer's own, completed ride can be rated
                     $booking = Booking::find()
-                        ->where(['id' => $booking_id])
+                        ->where(['id' => $booking_id, 'user_id' => $user_id, 'status' => Booking::STATUS_RIDE_COMPLETED])
                         ->one();
                     if (!empty($booking)) {
                         $user_booking_ratings_check = UserBookingRatings::find()
@@ -1374,9 +1576,6 @@ class UserController extends BKController
                         $data['status'] = self::API_NOK;
                         $data['error'] = 'booking data not found';
                     }
-                } else {
-                    $data['status'] = self::API_NOK;
-                    $data['error'] = 'booking_id required';
                 }
             } catch (Exception $e) {
                 $data['status'] = self::API_NOK;

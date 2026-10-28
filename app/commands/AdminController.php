@@ -32,7 +32,7 @@ class AdminController extends Controller
     }
     // [doc:end] options
 
-    // [doc:start] actionCreateSuperAdmin - yii admin/create-super-admin <email> - Creates a new user_role=admin account. Prompts for the password if it is not given on the command line.
+    // [doc:start] actionCreateSuperAdmin - Creates a new user_role = admin account.
     /**
      * Creates a new user_role = admin account.
      *
@@ -96,7 +96,7 @@ class AdminController extends Controller
     }
     // [doc:end] actionCreateSuperAdmin
 
-    // [doc:start] actionRevokeSuperAdmin - yii admin/revoke-super-admin <email> [--block] - Records a revoke request and reminds you to remove the email from params.php. --block also blocks the account immediately.
+    // [doc:start] actionRevokeSuperAdmin - Records that super-admin access should be revoked for $email, and reminds the operator to remove it.
     /**
      * Records that super-admin access should be revoked for $email, and reminds the operator to remove it
      * from 'superAdminEmails'. That file edit is the real revoke; this command does not make it for you
@@ -144,7 +144,7 @@ class AdminController extends Controller
     }
     // [doc:end] actionRevokeSuperAdmin
 
-    // [doc:start] actionListSuperAdmins - yii admin/list-super-admins - Cross-checks user_role=admin accounts against the superAdminEmails allowlist and shows recent audit log entries.
+    // [doc:start] actionListSuperAdmins - Lists every user_role = admin account and flags where the database and the allowlist disagree:.
     /**
      * Lists every user_role = admin account and flags where the database and the allowlist disagree:
      *   - an admin-role account whose email is NOT on the allowlist cannot sign in (dormant, e.g. a test

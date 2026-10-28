@@ -6,14 +6,14 @@ use app\modules\admin\models\Integrations;
 
 /**
  * The maps services in use and the order they are asked in (Integrations > Maps and routes > "Order of the map services", for example
- * "google,mapbox,openstreetmap"). A service without its key, or one that refuses or does not answer, is skipped for the next one, so a new
+ * "ola,google,mapbox,openstreetmap"). A service without its key, or one that refuses or does not answer, is skipped for the next one, so a new
  * key or a new service never stops bookings that another service can still serve.
  *
  * Asking: geocode() for addresses, route() for road distance and time. To add a service, extend MapProvider and list it in all().
  */
 class MapProviders
 {
-    const DEFAULT_ORDER = 'google,mapbox,openstreetmap';
+    const DEFAULT_ORDER = 'ola,google,mapbox,openstreetmap';
 
     // [doc:start] all - All
     /**
@@ -21,7 +21,7 @@ class MapProviders
      */
     public static function all()
     {
-        $list = [new GoogleMapProvider(), new MapboxMapProvider(), new OpenStreetMapProvider()];
+        $list = [new OlaMapProvider(), new GoogleMapProvider(), new MapboxMapProvider(), new OpenStreetMapProvider()];
         $out = [];
         foreach ($list as $p) {
             $out[$p->id()] = $p;

@@ -439,3 +439,37 @@ shows the live amount on the joining fee screen (`'Pay_Joining_fees_amount'.trPa
 Send `doc_type` next to `kind` when uploading an identity document: `driving_license`, `aadhar` or `pan_card` (anything else is stored as `other`). The profile photo uses
 `kind=profile` (no `doc_type` needed). Documents and profile photos are kept for life, each type in its own folder of a separate bucket; ride photos (`kind=ride`) are the only
 files that are ever deleted. Sample app: `pickImage(context, docType: 'aadhar')` on the Aadhaar, licence and PAN screens and `uploadImage(kind: 'profile')` for the selfie.
+
+## O. Booking radius, trip changes, live tracking and cancelling (27 Oct 2026)
+
+Plain-language rules: BUSINESS_GUIDE.md section 24. What the apps send and receive:
+
+### Customer app (`/api/user/*`)
+| Call | Change |
+|---|---|
+| `get-estimate` | A one-way booking without a drop returns NOK "Please choose a drop location for a one-way trip.". The drop is never blocked: a pickup or drop outside the city's map only makes the trip outstation (`trip_type` 2, `trip_notice` explains). The reply adds `trip_type` (1 in-city, 2 outstation), `trip_type_changed` (true when the server made it outstation), `trip_notice` (text to show before the customer confirms) and `incity_radius_km` (0 = no radius; quote it in the fare notes). The pickup chooses the price city whatever `city_id` the app sends. |
+| `view-booking-details`, `list-bookings` | New keys on a completed booking billed differently from the booking: `radius_converted` (true), `radius_note` (words to show), `route_points` (list of `{lat, lng}`, at most 150, draw it), `max_km_from_pickup`, `incity_radius_km`. While the ride is on: `driver_latitude`, `driver_longitude`, `driver_position_at` (status 3-6) and `live_distance_km`, `ride_elapsed_min` (status 6). |
+| `add-user-emergency-contacts` | Saving again replaces the customer's two contacts (it used to answer "Emergency contact Exist" for anyone after the first ever). |
+| `cancel-ride` | Unchanged request. A waiting booking is cancelled free (every offer is closed); once a driver accepted, the cancellation charge applies. |
+The in-city / outstation choice is only a request: the server decides from the trip, and can change it again when the ride ends (one way <-> round
+trip, in-city -> outstation). The final bill can differ from the quote; show `radius_note` when it is present.
+
+### Partner app (`/api/driver/*`)
+| Call | Change |
+|---|---|
+| `update-lat-lng` | Also accepts `accuracy` (metres), `speed_kmh` and `recorded_at` (milliseconds since 1970, the time the phone took the reading). While the driver has a started ride, every reading is added to the ride's distance by the server (BUSINESS_GUIDE 24.5). Send one every 10 s or less during a ride, with the three new fields. |
+| `bookings` (status 1) | Each booking has `distance_to_pickup_km` and `eta_to_pickup_min` (from the driver's last position to the pickup). Offers the driver rejected or cancelled are not returned again. |
+| `bookings-history` (status 11, Cancelled) | Returns rides the driver held that the customer cancelled and rides the driver cancelled; each row has `cancelled_by` (`customer` or `driver`). A ride the driver cancelled has `status` 10. |
+| `complete-ride` | `lat_long_route_map` is now optional and only a fallback: the server uses its own tracked distance. If sent, send at most a few hundred points (the whole local table of a long ride is too large for one request). |
+| `view-booking-details` | Same new keys as the customer's (`radius_converted`, `radius_note`, `route_points`) for a completed ride. A ride the customer cancelled has status 8: the app must stop showing it as active. |
+| Push `type=newOrder` | A new booking offer. Channel `new_booking_alert` (sound `noti6x`). `order_id` is the booking id. |
+
+End of a ride (28 Oct 2026): `add-review` (customer and driver) now answers NOK without a rating of 1-5 and a review text. `get-estimate` with
+`saveBooking=true` answers NOK with `error` and `rate_booking_id` when the customer's previous paid ride is unrated; the customer app opens the
+rating sheet for that id. `accept-ride` answers NOK (`details` and `error`) while the driver has a completed ride that is unpaid or unrated.
+Customer `list-bookings`: the Active list (no status) also holds a completed ride until it is paid and rated; Completed (status 7) holds only
+paid and rated rides. Driver `bookings` status 12 follows the same rule; driver `bookings-history` status 7 takes `start_date` / `end_date`
+(the Partner app's Completed tab on Bookings sends 2000-01-01 .. today).
+
+Partner app (27 Oct 2026): the background recorder now takes a reading every 20 m, sends the three new fields with at most one report every 10 s,
+clears its local points when a ride starts and uploads at most about 300 points at completion.

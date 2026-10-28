@@ -132,10 +132,15 @@ class ServiceMapController extends Controller
             if (!$canEdit) {
                 throw new ForbiddenHttpException('Only an administrator can change a map.');
             }
-            if ($request->post('save')) {
-                if (MapDesigner::saveBoundary($module, (int) $city, $areas['hull'])) {
+            if ($request->post('remove-pincode-map')) {
+                Yii::$app->db->createCommand()->delete('pincode_map', ['module' => $module, 'city_id' => (int) $city])->execute();
+                Yii::$app->session->setFlash('success', 'The pincode map of ' . $cityRow['name'] . ' was removed. The ' . ServiceModules::title($module)
+                    . ' service now uses the hand-drawn map again (if there is one).');
+            } elseif ($request->post('save')) {
+                // saved as a pincode map, apart from the hand-drawn map (which is not changed)
+                if (PincodeAreas::savePincodeMap($module, (int) $city, $areas['hull'], array_column($areas['pincodes'], 'pincode'))) {
                     Yii::$app->session->setFlash('success', 'The ' . ServiceModules::title($module) . ' service area of ' . $cityRow['name']
-                        . ' now follows its pincodes (' . count($areas['hull']) . ' corner points). Bookings outside it are refused.');
+                        . ' now follows its pincodes (' . count($areas['hull']) . ' corner points). The hand-drawn map was not changed.');
                 } else {
                     Yii::$app->session->setFlash('error', 'Nothing was saved: none of the pincodes could be placed on the map.');
                 }
@@ -151,6 +156,7 @@ class ServiceMapController extends Controller
             'areas' => $areas,
             'map' => MapDesigner::snapshot($module, (int) $city),
             'current' => ServiceModules::boundary($module, (int) $city),
+            'hasPincodeMap' => (new Query())->from('pincode_map')->where(['module' => $module, 'city_id' => (int) $city])->exists(),
             'canEdit' => $canEdit,
         ]);
     }

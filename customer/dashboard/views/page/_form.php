@@ -17,6 +17,8 @@ use yii\widgets\ActiveForm;
 
     <?= $form->field($model, 'id', ['template' => '{input}'])->textInput(['style' => 'display:none']); ?>
 
+    <?= $form->field($model, 'app_key')->dropDownList($model->appOptions())->hint(Yii::t('app', 'Each app has its own Terms, Privacy and Refund text. If several active pages have the same app and type, the newest one is shown.')) ?>
+
     <?= $form->field($model, 'title')->textInput(['maxlength' => true, 'placeholder' => 'Title']) ?>
 
     <?=$form->field($model, 'description')->widget(\mihaildev\ckeditor\CKEditor::className(), ['options' => ['rows' => 6], 'editorOptions' => ['preset' => 'full']])?>

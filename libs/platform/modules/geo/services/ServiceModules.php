@@ -128,8 +128,13 @@ class ServiceModules
      */
     public static function boundary($module, $cityId)
     {
-        $raw = (new Query())->select('boundary')->from('service_map')
+        // a map drawn from pincodes (pincode_map) is used first; the hand-drawn map is the fallback
+        $raw = (new Query())->select('boundary')->from('pincode_map')
             ->where(['module' => (int) $module, 'city_id' => (int) $cityId])->scalar();
+        if (!$raw) {
+            $raw = (new Query())->select('boundary')->from('service_map')
+                ->where(['module' => (int) $module, 'city_id' => (int) $cityId])->scalar();
+        }
         if (!$raw && (int) $module === self::DRIVER) {
             $raw = (new Query())->select('boundary')->from('city')->where(['id' => (int) $cityId])->scalar();
         }

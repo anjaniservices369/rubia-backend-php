@@ -138,6 +138,16 @@ use app\modules\admin\widgets\Menu;
                    && \Yii::$app->user->identity->user_role==User::ROLE_ADMIN,
            ],
            [
+               // Terms and Conditions, Privacy Policy and Refund Policy: a separate set for every app
+               // (customer app, driver partner app, each taxi partner app), chosen in the page form.
+               'label' => 'Terms & Policies',
+               'icon' => 'fas fa-file-contract',
+               'url' => ['/admin/page'],
+               'active' => 'page' === Yii::$app->controller->id,
+               'visible' => (!empty(\Yii::$app->params['customerDashboard']) || empty(\Yii::$app->params['serviceDashboard']))
+                   && \Yii::$app->user->identity->user_role == User::ROLE_ADMIN,
+           ],
+           [
             'label' => 'Franchise',
             'icon' => 'fas fa-users',
             'url' => '#',

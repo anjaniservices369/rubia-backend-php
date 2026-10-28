@@ -15,7 +15,7 @@ class Page extends BasePage
      */
     public function rules()
     {
-        return array_replace_recursive(parent::rules(),
+        $rules = array_replace_recursive(parent::rules(),
 	    [
             [['title', 'slug'], 'required'],
             [['description'], 'string'],
@@ -24,6 +24,10 @@ class Page extends BasePage
             [['title'], 'string', 'max' => 255],
             [['slug'], 'string', 'max' => 225]
         ]);
+        // appended after the merge above: that merge joins the two lists by position
+        $rules[] = [['app_key'], 'default', 'value' => self::APP_CUSTOMER];
+        $rules[] = [['app_key'], 'in', 'range' => array_keys(self::appOptions())];
+        return $rules;
     }
 	
 }

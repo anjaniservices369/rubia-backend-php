@@ -113,7 +113,7 @@ class SplitController extends Controller
     }
     // [doc:end] actionPlan
 
-    // [doc:start] actionPlanCustomer - Plan (customer app)
+    // [doc:start] actionPlanCustomer - php yii split/plan-customer what the Customer app owns, how many rows, and what stays shared.
     /**
      * php yii split/plan-customer   what the Customer app owns, how many rows, and what stays shared.
      *

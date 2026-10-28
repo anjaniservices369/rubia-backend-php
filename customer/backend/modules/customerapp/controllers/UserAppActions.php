@@ -25,6 +25,8 @@ use app\modules\admin\models\DriverWallet;
 use app\modules\admin\models\FavouriteLocation;
 use app\modules\admin\models\FcmNotification;
 use app\modules\admin\models\Notification;
+use app\modules\admin\models\Page;
+use app\modules\admin\models\LegalPageApi;
 use app\modules\admin\models\Services;
 use app\modules\admin\models\UserBookingRatings;
 use app\modules\admin\models\UserEmergencyContacts;
@@ -519,38 +521,30 @@ if (($send_otp['Status'] ?? '') == 'Success') {
                     )
                         ? $post['person_relationship_two']
                         : '';
-                    $user_emergency_contacts_count = UserEmergencyContacts::find()
-                        ->where(['user_id' => $user])
-                        ->count();
+                    // Saving again replaces this customer's own two contacts (a retry, or a customer who had saved them before,
+                    // must not be blocked). The old check passed the whole User object into the query, which Yii turned into a
+                    // list of all the user's field values, so it counted other customers' contacts and answered "Exist".
+                    UserEmergencyContacts::deleteAll(['user_id' => $user_id]);
 
-                    if ($user_emergency_contacts_count > 2) {
-                        $data['status'] = self::API_NOK;
-                        $data['details'] = 'Emergency contact Exist';
-                    } else {
-                        $user_emergency_contacts_one = new UserEmergencyContacts();
-                        $user_emergency_contacts_one->name = $person_name_one;
-                        $user_emergency_contacts_one->user_id = $user_id;
-
-                        $user_emergency_contacts_one->phone_number = $person_phone_number_one;
-                        $user_emergency_contacts_one->relationship = $person_relationship_one;
-                        $user_emergency_contacts_one->status =
-                            UserEmergencyContacts::STATUS_ACTIVE;
-                        $user_emergency_contacts_one->save(false);
-
-                        $user_emergency_contacts_two = new UserEmergencyContacts();
-                        $user_emergency_contacts_two->name = $person_name_two;
-                        $user_emergency_contacts_two->user_id = $user_id;
-
-                        $user_emergency_contacts_two->phone_number = $person_phone_number_two;
-                        $user_emergency_contacts_two->relationship = $person_relationship_two;
-                        $user_emergency_contacts_two->status =
-                            UserEmergencyContacts::STATUS_ACTIVE;
-                        $user_emergency_contacts_two->save(false);
-
-                        $data['status'] = self::API_OK;
-                        $data['details'] =
-                            'Emergency contact updated successfully';
+                    $people = [
+                        [$person_name_one, $person_phone_number_one, $person_relationship_one],
+                        [$person_name_two, $person_phone_number_two, $person_relationship_two],
+                    ];
+                    foreach ($people as $person) {
+                        if ($person[1] === '') {
+                            continue; // no number, nothing to save
+                        }
+                        $contact = new UserEmergencyContacts();
+                        $contact->name = $person[0];
+                        $contact->user_id = $user_id;
+                        $contact->phone_number = $person[1];
+                        $contact->relationship = $person[2];
+                        $contact->status = UserEmergencyContacts::STATUS_ACTIVE;
+                        $contact->save(false);
                     }
+
+                    $data['status'] = self::API_OK;
+                    $data['details'] = 'Emergency contact updated successfully';
                 } else {
                     $data['status'] = self::API_NOK;
                     $data['error'] = 'Wrong User';
@@ -843,6 +837,212 @@ if (($send_otp['Status'] ?? '') == 'Success') {
 
     // [doc:end] actionServices
     // Favourite Location
+
+    // [doc:start] actionLegalPage - /api/user/legal-page - Terms and Conditions, Privacy Policy or Refund Policy of the customer app
+    /**
+     * GET /api/user/legal-page?type=terms|privacy|refund   (no login: it is shown before login)
+     * The text is written in the admin dashboard (Terms & Policies, app = Customer app); the newest
+     * active page of that type is returned. `description` is HTML from the editor. Every other app
+     * (driver partner, taxi partner) has its own endpoint and its own pages.
+     */
+    public function actionLegalPage()
+    {
+        $body = LegalPageApi::response(Page::APP_CUSTOMER, Yii::$app->request->get('type'));
+        return $this->sendJsonResponse($body);
+    }
+
+    // [doc:end] actionLegalPage
+
+    // [doc:start] actionMyTransactions - /api/user/my-transactions - Everything the customer paid, across all services, by day and by month
+    /**
+     * GET /api/user/my-transactions?month=YYYY-MM   (header or query auth_code; month defaults to this month)
+     *
+     * One list for the whole app, whatever the service: completed Driver bookings, completed Bike / Auto / Car
+     * taxi rides and Wallet movements (recharges, referral earnings, cancellation charges). Wallet debits that
+     * only pay for a ride (type "ride booking") are left out: the ride itself is already in the list.
+     * Each source is read on its own, so a service that cannot be reached is skipped, not fatal.
+     *
+     * details: month, summary {total_spent, wallet_added, count, by_service[]}, days[{date, total_spent,
+     * items[]}] newest first, monthly[] = the last 6 months' totals (newest first).
+     */
+    public function actionMyTransactions()
+    {
+        $authCode = Yii::$app->request->headers->get('auth_code', Yii::$app->request->getQueryParam('auth_code'));
+        $user_id = (new AuthSettings())->getAuthSession($authCode);
+        if (empty($user_id)) {
+            return $this->sendJsonResponse(['status' => self::API_NOK, 'error' => Yii::t('app', 'User Not Found')]);
+        }
+
+        $month = (string) Yii::$app->request->get('month', date('Y-m'));
+        if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month)) {
+            $month = date('Y-m');
+        }
+        $start = $month . '-01 00:00:00';
+        $end = date('Y-m-t 23:59:59', strtotime($start));
+
+        $labels = ['driver' => 'Driver', 'bike' => 'Bike', 'auto' => 'Auto', 'car' => 'Car', 'wallet' => 'Wallet'];
+        // vehicals.vehicle_type: the service a taxi vehicle belongs to (ServiceModules: 2 car, 3 auto, 4 bike)
+        $taxiService = [2 => 'car', 3 => 'auto', 4 => 'bike'];
+        $db = Yii::$app->db;
+        $items = [];
+        $short = function ($text) {
+            $text = trim((string) $text);
+            return mb_strlen($text) > 60 ? mb_substr($text, 0, 57) . '...' : $text;
+        };
+
+        // 1. Driver service: completed bookings, what the customer pays is `subtotal` (final_price is the driver's share)
+        try {
+            $rows = $db->createCommand(
+                'SELECT id, booking_number, subtotal, drop_address, updated_on FROM booking
+                 WHERE user_id = :u AND status = 7 AND updated_on BETWEEN :s AND :e',
+                [':u' => $user_id, ':s' => $start, ':e' => $end]
+            )->queryAll();
+            foreach ($rows as $r) {
+                $items[] = [
+                    'id' => 'driver-' . $r['id'],
+                    'service' => 'driver',
+                    'title' => 'Driver booking #' . ($r['booking_number'] ?: $r['id']),
+                    'subtitle' => $short($r['drop_address']),
+                    'amount' => round((float) $r['subtotal'], 2),
+                    'direction' => 'debit',
+                    'date' => $r['updated_on'],
+                ];
+            }
+        } catch (\Throwable $e) {
+            Yii::warning('my-transactions: driver bookings skipped: ' . $e->getMessage());
+        }
+
+        // 2. Taxi services (bike / auto / car): completed (9) and paid (10) rides
+        try {
+            $rows = $db->createCommand(
+                'SELECT r.id, r.total_fare, r.drop_address, r.updated_on, v.vehicle_type FROM ride_request r
+                 LEFT JOIN vehicals v ON v.id = r.vehical_type
+                 WHERE r.user_id = :u AND r.status IN (9, 10) AND r.updated_on BETWEEN :s AND :e',
+                [':u' => $user_id, ':s' => $start, ':e' => $end]
+            )->queryAll();
+            foreach ($rows as $r) {
+                $service = $taxiService[(int) $r['vehicle_type']] ?? 'car';
+                $items[] = [
+                    'id' => $service . '-' . $r['id'],
+                    'service' => $service,
+                    'title' => $labels[$service] . ' ride #' . $r['id'],
+                    'subtitle' => $short($r['drop_address']),
+                    'amount' => round((float) $r['total_fare'], 2),
+                    'direction' => 'debit',
+                    'date' => $r['updated_on'],
+                ];
+            }
+        } catch (\Throwable $e) {
+            Yii::warning('my-transactions: taxi rides skipped: ' . $e->getMessage());
+        }
+
+        // 3. Wallet: recharge (1), cancellation charge (2), referral earning (3); successful entries only
+        try {
+            $walletTitle = [1 => 'Wallet recharge', 2 => 'Cancellation charge', 3 => 'Referral earning'];
+            $rows = $db->createCommand(
+                'SELECT id, amount, payment_type, type, method_reason, created_on FROM user_wallet
+                 WHERE user_id = :u AND status = 1 AND type IN (1, 2, 3) AND created_on BETWEEN :s AND :e',
+                [':u' => $user_id, ':s' => $start, ':e' => $end]
+            )->queryAll();
+            foreach ($rows as $r) {
+                $items[] = [
+                    'id' => 'wallet-' . $r['id'],
+                    'service' => 'wallet',
+                    'title' => $walletTitle[(int) $r['type']] ?? 'Wallet',
+                    'subtitle' => $short($r['method_reason']),
+                    'amount' => round((float) $r['amount'], 2),
+                    'direction' => ((int) $r['payment_type'] === 1) ? 'credit' : 'debit',
+                    'date' => $r['created_on'],
+                ];
+            }
+        } catch (\Throwable $e) {
+            Yii::warning('my-transactions: wallet skipped: ' . $e->getMessage());
+        }
+
+        usort($items, function ($a, $b) {
+            return strcmp($b['date'], $a['date']);
+        });
+
+        // Group by day and total up.
+        $days = [];
+        $spent = 0.0;
+        $added = 0.0;
+        $byService = [];
+        foreach ($items as $it) {
+            $day = substr($it['date'], 0, 10);
+            if (!isset($days[$day])) {
+                $days[$day] = ['date' => $day, 'total_spent' => 0.0, 'items' => []];
+            }
+            $it['service_label'] = $labels[$it['service']];
+            $days[$day]['items'][] = $it;
+            if ($it['direction'] === 'debit') {
+                $days[$day]['total_spent'] += $it['amount'];
+                $spent += $it['amount'];
+                $s = $it['service'];
+                $byService[$s] = $byService[$s] ?? ['service' => $s, 'label' => $labels[$s], 'amount' => 0.0, 'count' => 0];
+                $byService[$s]['amount'] += $it['amount'];
+                $byService[$s]['count']++;
+            } elseif ($it['service'] === 'wallet') {
+                $added += $it['amount'];
+            }
+        }
+        foreach ($days as &$d) {
+            $d['total_spent'] = round($d['total_spent'], 2);
+        }
+        unset($d);
+        foreach ($byService as &$b) {
+            $b['amount'] = round($b['amount'], 2);
+        }
+        unset($b);
+
+        // The last 6 months (this month back), what was spent in each: same sources, grouped by month.
+        $monthly = [];
+        for ($i = 0; $i < 6; $i++) {
+            $monthly[date('Y-m', strtotime(date('Y-m-01') . " -$i month"))] = ['month' => date('Y-m', strtotime(date('Y-m-01') . " -$i month")), 'total_spent' => 0.0, 'count' => 0];
+        }
+        $from = date('Y-m-01 00:00:00', strtotime(date('Y-m-01') . ' -5 month'));
+        $to = date('Y-m-t 23:59:59');
+        $sums = [
+            'SELECT DATE_FORMAT(updated_on, "%Y-%m") m, SUM(subtotal) a, COUNT(*) c FROM booking
+             WHERE user_id = :u AND status = 7 AND updated_on BETWEEN :s AND :e GROUP BY m',
+            'SELECT DATE_FORMAT(updated_on, "%Y-%m") m, SUM(total_fare) a, COUNT(*) c FROM ride_request
+             WHERE user_id = :u AND status IN (9, 10) AND updated_on BETWEEN :s AND :e GROUP BY m',
+            'SELECT DATE_FORMAT(created_on, "%Y-%m") m, SUM(amount) a, COUNT(*) c FROM user_wallet
+             WHERE user_id = :u AND status = 1 AND type = 2 AND payment_type = 2 AND created_on BETWEEN :s AND :e GROUP BY m',
+        ];
+        foreach ($sums as $sql) {
+            try {
+                foreach ($db->createCommand($sql, [':u' => $user_id, ':s' => $from, ':e' => $to])->queryAll() as $r) {
+                    if (isset($monthly[$r['m']])) {
+                        $monthly[$r['m']]['total_spent'] += (float) $r['a'];
+                        $monthly[$r['m']]['count'] += (int) $r['c'];
+                    }
+                }
+            } catch (\Throwable $e) {
+                Yii::warning('my-transactions: monthly totals skipped: ' . $e->getMessage());
+            }
+        }
+        foreach ($monthly as &$m) {
+            $m['total_spent'] = round($m['total_spent'], 2);
+        }
+        unset($m);
+
+        return $this->sendJsonResponse([
+            'status' => self::API_OK,
+            'details' => [
+                'month' => $month,
+                'summary' => [
+                    'total_spent' => round($spent, 2),
+                    'wallet_added' => round($added, 2),
+                    'count' => count($items),
+                    'by_service' => array_values($byService),
+                ],
+                'days' => array_values($days),
+                'monthly' => array_values($monthly),
+            ],
+        ]);
+    }
+    // [doc:end] actionMyTransactions
 
     // [doc:start] actionListFavouriteLocation - /api/user/list-favourite-location - List Favourite Location
     public function actionListFavouriteLocation()

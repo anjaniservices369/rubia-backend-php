@@ -19,7 +19,7 @@ use app\modules\admin\models\Page;
     {
         return [
             [['id', 'state_id', 'type_id', 'create_user_id', 'updated_user_id'], 'integer'],
-            [['title', 'slug', 'description', 'created_date', 'updated_date'], 'safe'],
+            [['title', 'slug', 'description', 'created_date', 'updated_date', 'app_key'], 'safe'],
         ];
     }
 
@@ -59,6 +59,7 @@ use app\modules\admin\models\Page;
             'id' => $this->id,
             'state_id' => $this->state_id,
             'type_id' => $this->type_id,
+            'app_key' => $this->app_key,
             'created_date' => $this->created_date,
             'updated_date' => $this->updated_date,
             'create_user_id' => $this->create_user_id,

@@ -1,0 +1,93 @@
+# GitLab CI/CD for the Rubia backend. Mirrors .github/workflows (ci.yml + deploy.yml).
+#
+#   lint     every push and merge request   PHP syntax check + composer validate
+#   build    main only                      composer install --no-dev, kept as an artifact
+#   deploy   main only                      FTP upload of app/ to staging (this cPanel plan has no SSH)
+#
+# Set these under Settings > CI/CD > Variables (masked; FTP_PASSWORD also protected):
+#   FTP_SERVER, FTP_USERNAME, FTP_PASSWORD, FTP_SERVER_DIR (e.g. /public_html/api/)
+# app/config/secrets.php and config/jwt-secret.php are git-ignored and never uploaded: they stay on the server.
+# Database migrations (php yii db/up --yes) are NOT run by this pipeline; see DEPLOY.md section 3.
+
+stages:
+  - lint
+  - build
+  - deploy
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+variables:
+  COMPOSER_CACHE_DIR: "$CI_PROJECT_DIR/.composer-cache"
+
+lint:php:
+  stage: lint
+  image: php:8.2-cli
+  script:
+    - |
+      set -e
+      find app -name '*.php' -not -path '*/vendor/*' -not -path '*/runtime/*' -print0 | xargs -0 -n1 -P4 php -l > /dev/null
+      find libs services customer -name '*.php' -not -path '*/vendor/*' -print0 2>/dev/null | xargs -0 -r -n1 -P4 php -l > /dev/null
+      echo "PHP syntax OK"
+
+lint:composer:
+  stage: lint
+  image: composer:2
+  script:
+    - cd app
+    - composer validate --no-check-publish --no-check-all || true
+  allow_failure: true
+
+build:app:
+  stage: build
+  image: composer:2
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  cache:
+    key:
+      files:
+        - app/composer.lock
+    paths:
+      - .composer-cache/
+  script:
+    - cd app
+    - composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
+  artifacts:
+    expire_in: 1 day
+    paths:
+      - app/
+
+deploy:staging:
+  stage: deploy
+  image: alpine:3.20
+  needs: ["build:app"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  environment:
+    name: staging
+  resource_group: staging
+  before_script:
+    - apk add --no-cache lftp ca-certificates
+    - test -n "$FTP_SERVER" -a -n "$FTP_USERNAME" -a -n "$FTP_PASSWORD" -a -n "$FTP_SERVER_DIR" || { echo "Missing FTP_* CI/CD variables"; exit 1; }
+  script:
+    - |
+      lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" <<EOF
+      set ftp:ssl-allow true
+      set ssl:verify-certificate no
+      set net:max-retries 3
+      set net:timeout 30
+      mirror --reverse --only-newer --parallel=4 --verbose=1 \
+        --exclude-glob config/secrets.php \
+        --exclude-glob config/jwt-secret.php \
+        --exclude-glob runtime/ \
+        --exclude-glob web/assets/ \
+        --exclude-glob uploads/ \
+        --exclude-glob uploads_bkp/ \
+        --exclude-glob .git/ \
+        app/ "$FTP_SERVER_DIR"
+      bye
+      EOF

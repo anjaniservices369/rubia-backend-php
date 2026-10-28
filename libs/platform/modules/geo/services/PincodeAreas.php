@@ -10,7 +10,7 @@ use yii\helpers\Json;
  * Draws a city's service area from its pincodes.
  *
  * How it works, in plain words:
- *   1. every pincode of the city (pincode table, active rows) is looked up once on Google (Geocoding API) and its
+ *   1. every pincode of the city (pincode table, active rows) is looked up once on OpenStreetMap (Google's Geocoding API is the backup) and its
  *      rectangle on the map is remembered in `pincode_area`;
  *   2. the service area is the smallest convex outline that contains all those rectangles;
  *   3. saved into `city.boundary`, which the apps' "do we serve this place" check (check-boundary, get-estimate)
@@ -42,42 +42,13 @@ class PincodeAreas
             return $row;
         }
 
-        $key = GoogleKeys::serverKey();
-        if ($key === '') {
-            return $row ?: null;
+        // OpenStreetMap first (free, no key); Google stays as the optional backup when OpenStreetMap does not know the pincode
+        $data = self::fromOpenStreetMap($pincode);
+        if ($data === null) {
+            $data = self::fromGoogle($pincode);
         }
-        $url = 'https://maps.googleapis.com/maps/api/geocode/json?' . http_build_query([
-            'components' => 'postal_code:' . $pincode . '|country:IN',
-            'key' => $key,
-        ]);
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 8]);
-        $body = curl_exec($ch);
-        curl_close($ch);
-        $json = $body ? json_decode($body, true) : null;
-        if (!is_array($json) || !isset($json['status'])) {
-            return $row ?: null;
-        }
-        if (!in_array($json['status'], ['OK', 'ZERO_RESULTS'], true)) {
-            Yii::warning('pincode geocode ' . $pincode . ': ' . $json['status'], 'geo');
-
-            return $row ?: null; // key problem / quota: do not remember it as "not found"
-        }
-
-        $data = ['pincode' => $pincode, 'found' => 0, 'fetched_on' => date('Y-m-d H:i:s')];
-        if ($json['status'] === 'OK' && !empty($json['results'][0]['geometry'])) {
-            $g = $json['results'][0]['geometry'];
-            $view = $g['viewport'] ?? ($g['bounds'] ?? null);
-            $data = array_merge($data, [
-                'found' => 1,
-                'lat' => $g['location']['lat'],
-                'lng' => $g['location']['lng'],
-                'ne_lat' => $view['northeast']['lat'] ?? $g['location']['lat'],
-                'ne_lng' => $view['northeast']['lng'] ?? $g['location']['lng'],
-                'sw_lat' => $view['southwest']['lat'] ?? $g['location']['lat'],
-                'sw_lng' => $view['southwest']['lng'] ?? $g['location']['lng'],
-                'formatted_address' => mb_substr((string) ($json['results'][0]['formatted_address'] ?? ''), 0, 255),
-            ]);
+        if ($data === null) {
+            return $row ?: null; // nobody could be asked (network, key, quota): do not remember it as "not found"
         }
         $db = Yii::$app->db;
         if ($row) {
@@ -89,6 +60,72 @@ class PincodeAreas
         return (new Query())->from('pincode_area')->where(['pincode' => $pincode])->one();
     }
     // [doc:end] lookup
+
+    /** @return array|null a pincode_area row's values, or null when OpenStreetMap found nothing or could not be asked */
+    private static function fromOpenStreetMap($pincode)
+    {
+        static $last = 0.0;
+        $wait = 1.1 - (microtime(true) - $last); // the service allows one request a second
+        if ($wait > 0) {
+            usleep((int) ($wait * 1000000));
+        }
+        $last = microtime(true);
+        $ch = curl_init('https://nominatim.openstreetmap.org/search?' . http_build_query([
+            'postalcode' => $pincode, 'countrycodes' => 'in', 'format' => 'jsonv2', 'limit' => 1,
+        ]));
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_USERAGENT => 'RubiaServices-admin/1.0']);
+        $body = curl_exec($ch);
+        curl_close($ch);
+        $json = $body ? json_decode($body, true) : null;
+        if (!is_array($json) || empty($json[0]['boundingbox']) || !isset($json[0]['lat'], $json[0]['lon'])) {
+            return null;
+        }
+        $r = $json[0];
+        $bb = $r['boundingbox']; // south, north, west, east
+
+        return ['pincode' => $pincode, 'found' => 1, 'fetched_on' => date('Y-m-d H:i:s'),
+            'lat' => (float) $r['lat'], 'lng' => (float) $r['lon'],
+            'ne_lat' => (float) $bb[1], 'ne_lng' => (float) $bb[3], 'sw_lat' => (float) $bb[0], 'sw_lng' => (float) $bb[2],
+            'formatted_address' => mb_substr((string) ($r['display_name'] ?? ''), 0, 255)];
+    }
+
+    /** @return array|null a pincode_area row's values (found 0 when Google says the pincode does not exist), or null when Google could not be asked */
+    private static function fromGoogle($pincode)
+    {
+        $key = GoogleKeys::serverKey();
+        if ($key === '') {
+            return null;
+        }
+        $ch = curl_init('https://maps.googleapis.com/maps/api/geocode/json?' . http_build_query([
+            'components' => 'postal_code:' . $pincode . '|country:IN', 'key' => $key,
+        ]));
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 8]);
+        $body = curl_exec($ch);
+        curl_close($ch);
+        $json = $body ? json_decode($body, true) : null;
+        if (!is_array($json) || !isset($json['status'])) {
+            return null;
+        }
+        if (!in_array($json['status'], ['OK', 'ZERO_RESULTS'], true)) {
+            Yii::warning('pincode geocode ' . $pincode . ': ' . $json['status'], 'geo');
+
+            return null;
+        }
+        $data = ['pincode' => $pincode, 'found' => 0, 'fetched_on' => date('Y-m-d H:i:s')];
+        if ($json['status'] === 'OK' && !empty($json['results'][0]['geometry'])) {
+            $g = $json['results'][0]['geometry'];
+            $view = $g['viewport'] ?? ($g['bounds'] ?? null);
+            $data = array_merge($data, [
+                'found' => 1, 'lat' => $g['location']['lat'], 'lng' => $g['location']['lng'],
+                'ne_lat' => $view['northeast']['lat'] ?? $g['location']['lat'], 'ne_lng' => $view['northeast']['lng'] ?? $g['location']['lng'],
+                'sw_lat' => $view['southwest']['lat'] ?? $g['location']['lat'], 'sw_lng' => $view['southwest']['lng'] ?? $g['location']['lng'],
+                'formatted_address' => mb_substr((string) ($json['results'][0]['formatted_address'] ?? ''), 0, 255),
+            ]);
+        }
+
+        return $data;
+    }
 
     // [doc:start] forCity - Everything the dashboard page needs for one city.
     /**
@@ -103,6 +140,16 @@ class PincodeAreas
             : (new Query())->select('name')->distinct()->from('pincode')
                 ->where(['city_id' => (int) $cityId, 'status' => 1])->orderBy('name')->column();
 
+        return self::forPincodes($names, $refresh);
+    }
+    // [doc:end] forCity
+
+    // [doc:start] forPincodes - The same as forCity, for a plain list of pincodes (used for the maps kept in pincode_map).
+    /**
+     * The same as forCity, for a plain list of pincodes (used for the maps kept in pincode_map).
+     */
+    public static function forPincodes(array $names, $refresh = false)
+    {
         $items = [];
         $points = [];
         foreach ($names as $name) {
@@ -157,7 +204,38 @@ class PincodeAreas
             'outliers' => count(array_filter($items, function ($i) { return $i['outlier']; })),
         ];
     }
-    // [doc:end] forCity
+    // [doc:end] forPincodes
+
+    // [doc:start] savePincodeMap - Saves the outline in pincode_map, together with the pincodes it was drawn from. The city's hand-drawn map (service_map,.
+    /**
+     * Saves the outline in pincode_map, together with the pincodes it was drawn from. The city's hand-drawn map (service_map,
+     * city.boundary) is not touched; Service maps read this one first.
+     */
+    public static function savePincodeMap($module, $cityId, array $hull, array $pincodes)
+    {
+        if (count($hull) < 3) {
+            return false;
+        }
+        $points = array_map(function ($p) {
+            return [round($p[0], 7), round($p[1], 7)];
+        }, $hull);
+        $now = date('Y-m-d H:i:s');
+        $row = [
+            'boundary' => Json::encode(json_encode($points)),
+            'pincodes' => Json::encode(array_values($pincodes)),
+            'pincode_count' => count($pincodes),
+            'updated_on' => $now,
+        ];
+        $db = Yii::$app->db;
+        if ((new Query())->from('pincode_map')->where(['module' => (int) $module, 'city_id' => (int) $cityId])->exists()) {
+            $db->createCommand()->update('pincode_map', $row, ['module' => (int) $module, 'city_id' => (int) $cityId])->execute();
+        } else {
+            $db->createCommand()->insert('pincode_map', $row + ['module' => (int) $module, 'city_id' => (int) $cityId, 'created_on' => $now])->execute();
+        }
+
+        return true;
+    }
+    // [doc:end] savePincodeMap
 
     // [doc:start] saveBoundary - Saves the outline as the city's boundary, in the format the existing boundary check reads.
     /**

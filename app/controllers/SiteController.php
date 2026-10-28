@@ -37,6 +37,7 @@ class SiteController extends Controller
 							'home',
 							'contact',
 							'about',
+							'account-deletion',
 							'captcha',
 							'login',
 							'admin-login',
@@ -56,6 +57,7 @@ class SiteController extends Controller
 							'home',
 							'contact',
 							'about',
+							'account-deletion',
 							'captcha',
 							'login',
 							'logout',
@@ -132,6 +134,31 @@ class SiteController extends Controller
 		}else{
 			return $this->redirect(['/admin/dashboard']);
 		}
+	}
+
+	/**
+	 * Public "delete my account" page (the link given to Google Play in the Data safety form). Records the request; support confirms it
+	 * by phone and processes it within 30 days. Signed-in app users can delete at once inside the app.
+	 */
+	public function actionAccountDeletion()
+	{
+		$this->layout = false;
+		$done = '';
+		$error = '';
+		$req = Yii::$app->request;
+		if ($req->isPost) {
+			$contact = preg_replace('/\D/', '', (string) $req->post('contact'));
+			$name = trim((string) $req->post('name'));
+			$role = $req->post('role') === 'Driver' ? 'Driver' : 'User';
+			if (strlen($contact) !== 10 || $name === '') {
+				$error = 'Please enter your name and your 10 digit registered mobile number.';
+			} else {
+				\app\components\AccountDeletion::logWebRequest($contact, $name, $role, (string) $req->post('reason'));
+				$done = 'Your request is received. We will call you on ' . $contact . ' to confirm and delete the account within 30 days.';
+			}
+		}
+
+		return $this->render('account-deletion', ['done' => $done, 'error' => $error]);
 	}
 
 	/**
