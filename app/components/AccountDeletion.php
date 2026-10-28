@@ -64,7 +64,7 @@ class AccountDeletion
                 }
             }
             $db->createCommand()->update('user', $set, ['id' => $userId])->execute();
-            foreach (['auth_session' => 'create_user_id', 'favourite_location' => 'user_id', 'user_emergency_contacts' => 'user_id', 'driver_emergency_contacts' => 'driver_id'] as $t => $c) {
+            foreach (['auth' => 'user_id', 'auth_session' => 'create_user_id', 'favourite_location' => 'user_id', 'user_emergency_contacts' => 'user_id', 'driver_emergency_contacts' => 'driver_id'] as $t => $c) {
                 if ($db->getTableSchema($t) && $db->getTableSchema($t)->getColumn($c)) {
                     $db->createCommand()->delete($t, [$c => $userId])->execute();
                 }
