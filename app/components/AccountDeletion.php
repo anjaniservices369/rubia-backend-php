@@ -16,7 +16,7 @@ class AccountDeletion
     const STATUS_PENDING = 0;
     const STATUS_DONE = 1;
 
-    const OPEN_RIDE_STATUSES = '2,4,5,6';
+    const OPEN_RIDE_STATUSES = '1,2,4,5,6';
 
     /** the reason the account cannot be deleted right now, or '' when it can */
     public static function blocker($userId, $role)
@@ -27,7 +27,7 @@ class AccountDeletion
             [':u' => $userId]
         )->queryScalar();
 
-        return $open > 0 ? 'A ride is in progress. Finish it first, then delete the account.' : '';
+        return $open > 0 ? 'A booking is still open. Cancel or finish it first, then delete the account.' : '';
     }
 
     /** erases the personal data of the user and logs the request; returns [ok, message] */
