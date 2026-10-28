@@ -1,12 +1,20 @@
-# GitLab CI/CD for the Rubia backend. Mirrors .github/workflows (ci.yml + deploy.yml).
+# GitLab CI/CD for the Rubia backend with three environments. Mirrors .github/workflows (ci.yml + deploy.yml).
 #
 #   lint     every push and merge request   PHP syntax check + composer validate
-#   build    main only                      composer install --no-dev, kept as an artifact
-#   deploy   main only                      FTP upload of app/ to staging (this cPanel plan has no SSH)
+#   build    develop, staging, main         composer install --no-dev, kept as an artifact
+#   deploy   by branch:
+#     develop  -> dev         automatic
+#     staging  -> staging     automatic
+#     main     -> production  MANUAL: press the play button on the deploy:production job
+#   All deploys are an FTP upload of app/ (this cPanel plan has no SSH).
 #
-# Set these under Settings > CI/CD > Variables (masked; FTP_PASSWORD also protected):
+# Set these under Settings > CI/CD > Variables, ONE SET PER ENVIRONMENT: give each variable the
+# Environment scope dev, staging or production (masked; FTP_PASSWORD also protected):
 #   FTP_SERVER, FTP_USERNAME, FTP_PASSWORD, FTP_SERVER_DIR (e.g. /public_html/api/)
-# app/config/secrets.php and config/jwt-secret.php are git-ignored and never uploaded: they stay on the server.
+# Variables that today have scope "All" (the old staging values) must be changed to scope "staging",
+# otherwise dev and production would try to upload to the staging server.
+# Protect the main and staging branches (Settings > Repository) so only maintainers can deploy them.
+# app/config/secrets.php and config/jwt-secret.php are git-ignored and never uploaded: each server keeps its own.
 # Database migrations (php yii db/up --yes) are NOT run by this pipeline; see DEPLOY.md section 3.
 
 stages:
@@ -46,7 +54,7 @@ build:app:
   stage: build
   image: composer:2
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH =~ /^(develop|staging|main)$/
   cache:
     key:
       files:
@@ -61,18 +69,13 @@ build:app:
     paths:
       - app/
 
-deploy:staging:
+.ftp-deploy:
   stage: deploy
   image: alpine:3.20
   needs: ["build:app"]
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  environment:
-    name: staging
-  resource_group: staging
   before_script:
     - apk add --no-cache lftp ca-certificates
-    - test -n "$FTP_SERVER" -a -n "$FTP_USERNAME" -a -n "$FTP_PASSWORD" -a -n "$FTP_SERVER_DIR" || { echo "Missing FTP_* CI/CD variables"; exit 1; }
+    - test -n "$FTP_SERVER" -a -n "$FTP_USERNAME" -a -n "$FTP_PASSWORD" -a -n "$FTP_SERVER_DIR" || { echo "Missing FTP_* CI/CD variables for environment $CI_ENVIRONMENT_NAME"; exit 1; }
   script:
     - |
       lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" <<EOF
@@ -80,14 +83,32 @@ deploy:staging:
       set ssl:verify-certificate no
       set net:max-retries 3
       set net:timeout 30
-      mirror --reverse --only-newer --parallel=4 --verbose=1 \
-        --exclude-glob config/secrets.php \
-        --exclude-glob config/jwt-secret.php \
-        --exclude-glob runtime/ \
-        --exclude-glob web/assets/ \
-        --exclude-glob uploads/ \
-        --exclude-glob uploads_bkp/ \
-        --exclude-glob .git/ \
-        app/ "$FTP_SERVER_DIR"
+      mirror --reverse --only-newer --parallel=4 --verbose=1         --exclude-glob config/secrets.php         --exclude-glob config/jwt-secret.php         --exclude-glob runtime/         --exclude-glob web/assets/         --exclude-glob uploads/         --exclude-glob uploads_bkp/         --exclude-glob .git/         app/ "$FTP_SERVER_DIR"
       bye
       EOF
+
+deploy:dev:
+  extends: .ftp-deploy
+  rules:
+    - if: $CI_COMMIT_BRANCH == "develop"
+  environment:
+    name: dev
+  resource_group: dev
+
+deploy:staging:
+  extends: .ftp-deploy
+  rules:
+    - if: $CI_COMMIT_BRANCH == "staging"
+  environment:
+    name: staging
+  resource_group: staging
+
+deploy:production:
+  extends: .ftp-deploy
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+  allow_failure: false
+  environment:
+    name: production
+  resource_group: production

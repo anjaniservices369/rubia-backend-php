@@ -1,12 +1,34 @@
-name: Deploy to staging (FTP, no SSH)
+# Deploy over FTP (no SSH on this host) to one of three environments, chosen by branch:
+#
+#   develop -> dev        staging -> staging        main -> production
+#
+# Create the environments under Settings > Environments (dev, staging, production). On "production" tick
+# "Required reviewers" so a deploy waits for an approval click. Put the four secrets in EACH environment
+# (Settings > Environments > <name> > Environment secrets), with different values per server:
+#   FTP_SERVER, FTP_USERNAME, FTP_PASSWORD, FTP_SERVER_DIR
+# Move the old repository-level FTP_* secrets (they pointed at staging) into the "staging" environment.
+# Database migrations are not run here; see DEPLOY.md section 3.
+name: Deploy (dev / staging / production)
 
 on:
   push:
-    branches: [main]
+    branches: [develop, staging, main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy this branch to
+        default: dev
+        type: choice
+        options: [dev, staging, production]
+
+concurrency:
+  group: deploy-${{ inputs.environment || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || (github.ref_name == 'main' && 'production' || github.ref_name == 'staging' && 'staging' || 'dev') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,6 +52,7 @@ jobs:
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
           exclude: |
             **/config/secrets.php
+            **/config/jwt-secret.php
             **/runtime/**
             **/web/assets/**
             **/uploads/**
