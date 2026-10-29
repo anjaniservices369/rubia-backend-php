@@ -576,3 +576,21 @@ Status on 28 Oct 2026: the first pipelines on `develop`, `staging` and `main` fa
 - **Withdrawals:** `driver/withdraw` needs the driver's registered bank account, enforces `min_withdraw` and whole rupees, and writes the bank into the request. The office pays it from **Payments > Withdrawals** and presses *Mark paid* with the bank
   reference, or *Reject* to return the amount. `driver/withdraw-info` feeds the app's Withdraw sheet.
 - **Profile approval:** `user-verify-profile` no longer fails for a driver without a referral record.
+
+## 36. Environments, GitHub Actions and production FTP (29 Oct 2026)
+
+- **Two CI systems, same three environments.** GitLab (`.gitlab-ci.yml`) and GitHub Actions (`.github/workflows/ci.yml`, `deploy.yml`) both deploy `develop` -> dev, `staging` -> staging, `main` -> production by FTP. Push to both with `git push all develop`.
+- **Production FTP values are stored** (names: `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD`, `FTP_SERVER_DIR`) in GitLab (variable scope `production`, password masked) and in the GitHub `production` environment as secrets. Host `ftp.rubia.services`, user `rubia.services`, folder `/public_html/`. **Dev and staging FTP values are not stored yet** (their jobs stop with "Missing FTP_* variables").
+- **The production login was rejected** (FTP error 530) when tested on 29 Oct 2026, so the stored password is wrong or expired. Reset it in the hosting panel's FTP section and update both places. Keep the password out of chat and files.
+- **Certificate name:** the FTP server presents a certificate for `*.gb.stackcp.com` (the hosting provider), not for `ftp.rubia.services`; that is why the pipeline uses `ssl:verify-certificate no`. The same server answers as `ftp.gb.stackcp.com`, where the certificate verifies.
+- **Before the first production deploy:** the deploy uploads the contents of `app/` into `/public_html/`, so the site's document root must point at the `web/` folder inside it, and `config/secrets.php` and `config/jwt-secret.php` must already exist there (never uploaded). On 29 Oct 2026 `rubia.services` still answered 200 with an HTML page for `/`, `/web/` and `/api/`.
+- **Hosts checked 29 Oct 2026:** `staging.rubiaservices.org` serves the API; `staging.rubia.services` also answers like the API; `dev.rubia.services` is a website only (`/api` is 404); `dev.rubiaservices.org` does not exist yet. The apps use `https://staging.rubiaservices.org/api` for dev and staging builds.
+
+## 37. The live database is behind the code (29 Oct 2026)
+
+A structure export of the live database (61 tables) was compared with the local database. Live is missing what migrations `001`-`036` add (see `app/database/README.md`): the tables `media`, `page`, `taxi_payout`, `taxi_rating`, `pincode_area`, `map_log`, `service_map`, `service_map_pincode`, `service_billing_profile`, `service_invoice`, `service_invoice_counter`, `payment_order`, and the columns `booking.booking_number`, `user.uuid` and a `module` column on the wallet and earnings tables. The live database still uses the old `skipper_*` names.
+
+- **No SSH**, so `php yii db/up --yes` cannot run. Back up the live database first, then run the `.up.sql` scripts in order in phpMyAdmin and add each name to `db_migration_log`.
+- **Live-only columns** (`user.joining_fee`, `joining_fee_transaction_id`, `joining_fee_reason`, `driver_subscription_logs.transaction_id`) are not used by the code and not in any migration. Leave them.
+- `wallet` and `transaction` exist locally but not in the export and are not clearly created by a migration; check them before the first live release.
+- **Local copy of live registrations (29 Oct 2026):** missing drivers and customers were copied from a live export into the local databases (950 drivers and 147 customers, with their licence, Aadhaar, PAN, bank, vehicle-type, emergency-contact and saved-location rows). Names and phone numbers are exact. This is real personal data: it stays on the owner's PC only, never in a repository or a shared server. Delete the export file when finished.
