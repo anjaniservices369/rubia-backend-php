@@ -149,6 +149,95 @@ class PaymentOrders
     }
     // [doc:end] confirm
 
+    // [doc:start] createCashfree - Create Cashfree
+    /**
+     * The same as create(), for Cashfree: the server decides the amount, creates the Cashfree order and keeps a payment_order row
+     * (gateway "cashfree"). The app opens Cashfree's checkout with order_id and payment_session_id.
+     *
+     * @return array ['ok' => bool, 'error' => string, 'checkout' => array] checkout = order_id, payment_session_id, mode, amount, currency
+     */
+    public static function createCashfree($userId, $purpose, $requestedAmount = 0)
+    {
+        $user = User::findOne((int) $userId);
+        if (!$user) {
+            return ['ok' => false, 'error' => 'User not found'];
+        }
+        $amount = self::amountFor($purpose, $requestedAmount);
+        if (!is_float($amount)) {
+            return ['ok' => false, 'error' => $amount];
+        }
+        if ($purpose === self::JOINING_FEE && (int) $user->is_paid_joining_fee === 1) {
+            return ['ok' => false, 'error' => 'The joining fee is already paid.'];
+        }
+        $orderId = 'cf_' . $purpose . '_' . (int) $userId . '_' . time();
+        $reply = (new CashFree())->CreateOrders([
+            'name' => 'partner' . (int) $userId,
+            'email' => (string) ($user->email ?: 'partner' . (int) $userId . '@example.invalid'),
+            'customer_phone' => (string) $user->contact_no,
+            'order_id' => $orderId,
+            'order_amount' => number_format($amount, 2, '.', ''),
+        ]);
+        $order = json_decode((string) $reply, true);
+        if (!is_array($order) || empty($order['payment_session_id'])) {
+            Yii::error('Cashfree order not created: ' . (string) $reply, 'payments');
+
+            return ['ok' => false, 'error' => 'Cashfree could not start the payment' . (is_array($order) && !empty($order['message']) ? ': ' . $order['message'] : '.')];
+        }
+        Yii::$app->db->createCommand()->insert('payment_order', [
+            'user_id' => (int) $userId,
+            'purpose' => $purpose,
+            'amount' => $amount,
+            'currency' => 'INR',
+            'gateway' => 'cashfree',
+            'gateway_order_id' => $orderId,
+            'status' => 'created',
+            'applied' => 0,
+            'created_on' => date('Y-m-d H:i:s'),
+        ])->execute();
+
+        return ['ok' => true, 'checkout' => [
+            'order_id' => $orderId,
+            'payment_session_id' => $order['payment_session_id'],
+            'mode' => CashFree::cred('cashfree_pg_mode') === 'production' ? 'production' : 'sandbox',
+            'amount' => $amount,
+            'currency' => 'INR',
+            'purpose' => $purpose,
+        ]];
+    }
+    // [doc:end] createCashfree
+
+    // [doc:start] confirmCashfree - Confirm Cashfree
+    /**
+     * The app says the Cashfree checkout finished. Nothing the app sends is trusted: the order is read back from Cashfree and must be
+     * PAID for this exact amount; then the first caller applies it (see markPaid()).
+     *
+     * @return array ['ok' => bool, 'error' => string, 'purpose' => string, 'already' => bool]
+     */
+    public static function confirmCashfree($userId, $orderId, $expectPurpose = null)
+    {
+        $row = self::row('gateway_order_id', (string) $orderId, 'cashfree');
+        if (!$row || (int) $row['user_id'] !== (int) $userId) {
+            return ['ok' => false, 'error' => 'Payment order not found.'];
+        }
+        if ($expectPurpose !== null && $row['purpose'] !== $expectPurpose) {
+            return ['ok' => false, 'error' => 'This payment is not for that purpose.'];
+        }
+        if ($row['status'] === 'paid') {
+            return ['ok' => true, 'purpose' => $row['purpose'], 'already' => true];
+        }
+        $o = json_decode((string) (new CashFree())->verifyPayment((string) $orderId), true);
+        if (!is_array($o) || ($o['order_status'] ?? '') !== 'PAID') {
+            return ['ok' => false, 'error' => 'The payment was not completed.'];
+        }
+        if (abs((float) ($o['order_amount'] ?? 0) - (float) $row['amount']) > 0.001) {
+            return ['ok' => false, 'error' => 'The paid amount does not match the order.'];
+        }
+        $done = self::markPaid($row, (string) ($o['cf_order_id'] ?? $orderId));
+
+        return ['ok' => true, 'purpose' => $row['purpose'], 'already' => !$done];
+    }
+    // [doc:end] confirmCashfree
+
     // [doc:start] fromWebhook - From Webhook
     /**
      * @return string what was done: paid | failed | ignored
@@ -426,7 +515,7 @@ class PaymentOrders
             $w->driver_id = $uid;
             $w->amount = (int) round($row['amount']);
             $w->payment_type = \app\modules\admin\models\DriverWallet::payment_type_credit;
-            $w->method_reason = 'Amount credit ' . $row['amount'] . ' (' . ($row['gateway'] === 'manual' ? 'UPI, approved by the company' : 'Razorpay ' . $row['gateway_order_id']) . ')';
+            $w->method_reason = 'Amount credit ' . $row['amount'] . ' (' . ($row['gateway'] === 'manual' ? 'UPI, approved by the company' : ucfirst($row['gateway']) . ' ' . $row['gateway_order_id']) . ')';
             $w->status = \app\modules\admin\models\DriverWallet::STATUS_SUCCESS;
             $w->save(false);
         } elseif ($row['purpose'] === self::SUBSCRIPTION) {

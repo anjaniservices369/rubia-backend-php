@@ -168,6 +168,7 @@ class DriverController extends BKController
                           'auto-cancel-subscription',
                            'current-city',
                             'razorpay-create-order',
+                            'cashfree-create-order',
                             'razorpay-verify',
                             'razorpay-webhook',
                             'onboarding-status',
@@ -246,6 +247,7 @@ class DriverController extends BKController
                           'auto-cancel-subscription',
                           'current-city',
                             'razorpay-create-order',
+                            'cashfree-create-order',
                             'razorpay-verify',
                             'razorpay-webhook',
                             'onboarding-status',
@@ -602,6 +604,8 @@ if (($send_otp['Status'] ?? '') == 'Success') {
                         ? $post['date_of_birth']
                         : '';
                     $gender = !empty($post['gender']) ? $post['gender'] : '';
+                    // The Partner app sends the home address with the profile; it used to be ignored.
+                    $address = isset($post['address']) ? trim((string) $post['address']) : null;
 
                     if (trim($first_name) === '' || trim($last_name) === '') {
                         // both names are mandatory: no blanks
@@ -616,6 +620,9 @@ if (($send_otp['Status'] ?? '') == 'Success') {
                         $model->email = $email;
                         $model->date_of_birth = $date_of_birth;
                         $model->gender = $gender;
+                        if ($address !== null && $address !== '') {
+                            $model->address = $address;
+                        }
 
                         if ($model->save(false)) {
                             $data['status'] = self::API_OK;
@@ -1266,6 +1273,39 @@ public function actionApplyReferral()
     }
     // [doc:end] actionRazorpayCreateOrder
 
+    // [doc:start] actionCashfreeCreateOrder - /api/driver/cashfree-create-order - Starts a Cashfree payment.
+    /**
+     * Starts a Cashfree payment.
+     *
+     * POST /api/driver/cashfree-create-order   purpose (joining_fee | wallet_topup | subscription), amount (wallet_topup only)
+     * OK: details = order_id, payment_session_id, mode (sandbox | production), amount, currency - pass them to the Cashfree checkout.
+     * Afterwards send the same order_id to /api/driver/pay-joining-fee with gateway=cashfree.
+     */
+    public function actionCashfreeCreateOrder()
+    {
+        $data = [];
+        $headers = isset(\Yii::$app->request->headers['auth_code']) ? \Yii::$app->request->headers['auth_code'] : Yii::$app->request->getQueryParam('auth_code');
+        $user_id = (new AuthSettings())->getAuthSession($headers);
+        if (empty($user_id)) {
+            $data['status'] = self::API_NOK;
+            $data['error'] = 'User Not Found';
+
+            return $this->sendJsonResponse($data);
+        }
+        $post = Yii::$app->request->post();
+        $r = \app\modules\payments\services\PaymentOrders::createCashfree($user_id, $post['purpose'] ?? '', $post['amount'] ?? 0);
+        if ($r['ok']) {
+            $data['status'] = self::API_OK;
+            $data['details'] = $r['checkout'];
+        } else {
+            $data['status'] = self::API_NOK;
+            $data['error'] = $r['error'];
+        }
+
+        return $this->sendJsonResponse($data);
+    }
+    // [doc:end] actionCashfreeCreateOrder
+
     // [doc:start] actionRazorpayVerify - /api/driver/razorpay-verify - POST /api/driver/razorpay-verify razorpay_order_id, razorpay_payment_id, razorpay_signature.
     /**
      * POST /api/driver/razorpay-verify   razorpay_order_id, razorpay_payment_id, razorpay_signature
@@ -1530,6 +1570,15 @@ public function actionApplyReferral()
     private function confirmRazorpay($userId, $purpose)
     {
         $post = Yii::$app->request->post();
+        if (($post['gateway'] ?? '') === 'cashfree') {
+            // Cashfree: the order is read back from Cashfree (no signature from the app is involved).
+            $cfOrder = (string) ($post['orderId'] ?? ($post['order_id'] ?? ''));
+            if ($cfOrder === '') {
+                return ['ok' => false, 'error' => 'order_id is required.'];
+            }
+
+            return \app\modules\payments\services\PaymentOrders::confirmCashfree($userId, $cfOrder, $purpose);
+        }
         $orderId = $post['razorpay_order_id'] ?? ($post['orderId'] ?? '');
         $paymentId = $post['razorpay_payment_id'] ?? '';
         $signature = $post['razorpay_signature'] ?? '';
