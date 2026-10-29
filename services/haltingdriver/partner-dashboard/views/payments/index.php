@@ -87,16 +87,17 @@ $badge = ['paid' => 'success', 'created' => 'secondary', 'failed' => 'danger', '
 
     <div class="card mt-3"><div class="card-header"><strong>Latest payments</strong></div>
     <div class="table-responsive"><table class="table table-sm table-striped mb-0">
-        <thead><tr><th>#</th><th>Partner</th><th>For</th><th class="text-end">Amount</th><th>Status</th><th>Razorpay order</th><th>Payment</th><th>Date</th></tr></thead>
+        <thead><tr><th>#</th><th>Partner</th><th>For</th><th class="text-end">Amount</th><th>Gateway</th><th>Status</th><th>Gateway order</th><th>Payment</th><th>Date</th></tr></thead>
         <tbody>
         <?php foreach ($orders as $o): ?>
             <tr><td><?= (int) $o['id'] ?></td><td>#<?= (int) $o['user_id'] ?></td><td><?= Html::encode(str_replace('_', ' ', $o['purpose'])) ?></td>
                 <td class="text-end">&#8377;<?= number_format((float) $o['amount'], 2) ?></td>
+                <td><?= Html::encode(ucfirst(str_replace('_', ' ', (string) $o['gateway']))) ?></td>
                 <td><span class="badge text-bg-<?= $badge[$o['status']] ?? 'light' ?>"><?= Html::encode($o['status']) ?></span></td>
                 <td><?= Html::encode($o['gateway_order_id']) ?></td><td><?= Html::encode($o['gateway_payment_id']) ?></td>
                 <td><?= Html::encode($o['paid_on'] ?: $o['created_on']) ?></td></tr>
         <?php endforeach; ?>
-        <?php if (!$orders): ?><tr><td colspan="8" class="text-muted">No payments yet.</td></tr><?php endif; ?>
+        <?php if (!$orders): ?><tr><td colspan="9" class="text-muted">No payments yet.</td></tr><?php endif; ?>
         </tbody>
     </table></div></div>
 </div>
