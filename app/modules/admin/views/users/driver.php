@@ -232,10 +232,19 @@ $this->registerJs($search);
 ],
 
 [
+    // The one-time joining fee: paid (amount and the gateway it was paid through) or not paid yet.
     'attribute' => 'paid_amount',
-    'label' => 'Registration Fee',
+    'label' => 'Joining fee',
+    'format' => 'raw',
     'value' => function ($model) {
-        return $model->paid_amount; // Assuming 'paid_amount' is the attribute name in your User model
+        if ((int) $model->is_paid_joining_fee !== 1) {
+            return '<span class="badge bg-warning text-dark">Not paid</span>';
+        }
+        $gateway = (new \yii\db\Query())->select('gateway')->from('payment_order')
+            ->where(['user_id' => $model->id, 'purpose' => 'joining_fee', 'status' => 'paid'])->orderBy(['id' => SORT_DESC])->scalar();
+        $text = '<span class="badge bg-success">Paid</span> &#8377;' . number_format((float) $model->paid_amount, 2);
+
+        return $text . ($gateway ? ' <small class="text-muted">' . \yii\helpers\Html::encode(ucfirst(str_replace('_', ' ', $gateway))) . '</small>' : '');
     },
 ],
 
