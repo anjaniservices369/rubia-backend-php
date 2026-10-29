@@ -298,6 +298,8 @@ Never put the storage keys in code or in a release zip.
 
 ## 21. When the payment gateway does not work: QR payments
 
+> **Removed on 29 Oct 2026:** the manual UPI QR payment, its approval list and the `company_upi_*` settings no longer exist (see section 35). The text below is kept only as history.
+
 The partner app pays in three tiers, so a partner is never stuck:
 
 1. **Razorpay checkout** (cards, UPI apps, netbanking).
@@ -546,7 +548,7 @@ cards to a row, because their sections hold wide forms: their root box has the c
 6. After deploying, run the re-test list in DEVELOPER_GUIDE.md section 12 (items 10-14) against a copy of the database. The apps need the matching
    builds (MOBILE_APP_CHANGES.md section O); old builds keep working but do not show the route card or the trip notice.
 
-## 18. GitLab CI/CD (from 28 Oct 2026)
+## 34. GitLab CI/CD (from 28 Oct 2026)
 
 The code lives in `gitlab.com/rubia-services-group/rubia-backend-php` (private); GitHub stays as a second remote. `.gitlab-ci.yml` runs:
 
@@ -564,11 +566,11 @@ The pipeline does **not** run migrations (no SSH): run `php yii db/status` and `
 
 Status on 28 Oct 2026: the first pipelines on `develop`, `staging` and `main` failed without creating any job. A new gitlab.com account usually has to be verified (or have CI minutes) before jobs can run; check the pipeline page. The live site `rubia.services` was still a placeholder page answering 200 for every path (including `/account-deletion`) until the backend is deployed there with its document root on `app/web`; check the page shows the deletion form before submitting the URL to Google Play.
 
-## 19. Partner payments and withdrawals (29 Oct 2026)
+## 35. Partner payments and withdrawals (29 Oct 2026)
 
 - **Gateways:** the partner app pays the joining fee, wallet top-ups and the subscription through **Razorpay or Cashfree**. The server decides the price (joining fee: Integrations > Driver settings; subscription: Plans) and
   confirms every payment with the gateway before applying it (`PaymentOrders::create/confirm`, `createCashfree/confirmCashfree`; rows in `payment_order`). Cashfree uses the keys and mode
-  (`cashfree_pg_mode`: `test` or `production`) set in Integrations; set it to `production` on the live server. Set the Razorpay webhook (section 19 above) so a payment made just before the app closes is still applied;
+  (`cashfree_pg_mode`: `test` or `production`) set in Integrations; set it to `production` on the live server. Set the Razorpay webhook (section 19) so a payment made just before the app closes is still applied;
   there is no Cashfree webhook yet.
 - **Removed:** the manual UPI QR payment (`manual-payment-submit/status`, the approval list and the `company_upi_*` settings).
 - **Withdrawals:** `driver/withdraw` needs the driver's registered bank account, enforces `min_withdraw` and whole rupees, and writes the bank into the request. The office pays it from **Payments > Withdrawals** and presses *Mark paid* with the bank
