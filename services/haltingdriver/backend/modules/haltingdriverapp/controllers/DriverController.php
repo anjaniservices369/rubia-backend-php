@@ -1909,7 +1909,10 @@ public function actionApplyReferral()
         $data = [];
         try {
             $post = \Yii::$app->request->post();
-            $amount = !empty($post['amount']) ? $post['amount'] : 0;
+            // The amount must be a plain positive number: a negative "withdrawal" used to be accepted and raised the balance.
+            $rawAmount = isset($post['amount']) ? trim((string) $post['amount']) : '';
+            // Whole rupees only: the wallet stores whole rupees, so 20.5 would have been recorded as 20.
+            $amount = preg_match('/^\d{1,7}$/', $rawAmount) ? (int) $rawAmount : 0;
             $headers = isset(\Yii::$app->request->headers['auth_code'])
                 ? \Yii::$app->request->headers['auth_code']
                 : Yii::$app->request->getQueryParam('auth_code');
@@ -1924,7 +1927,8 @@ public function actionApplyReferral()
                         $user->id,
                         \app\modules\geo\services\ServiceModules::DRIVER
                     );
-                    if ($availableBalance > $amount && !empty($amount)) {
+                    // The whole balance can be withdrawn (it used to have to be strictly more than the amount).
+                    if ($amount > 0 && $availableBalance >= $amount) {
                         $driver_wallet = new DriverWallet();
                         $driver_wallet->driver_id = $user_id;
                         $driver_wallet->amount = $amount;
@@ -1942,8 +1946,9 @@ public function actionApplyReferral()
                         }
                     } else {
                         $data['status'] = self::API_NOK;
-                        $data['error'] =
-                            'Available amount is ' . $availableBalance;
+                        $data['error'] = $amount > 0
+                            ? 'Available amount is ' . $availableBalance
+                            : 'Enter a whole number of rupees greater than zero.';
                     }
                 } else {
                     $data['status'] = self::API_NOK;
