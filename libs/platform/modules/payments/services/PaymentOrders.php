@@ -285,19 +285,16 @@ class PaymentOrders
     // [doc:start] options - Options
     /**
      * @param string|null $purpose when given, the reply also carries the amount the server will charge for it
-     * @return array ['amount' => float|null, 'checkout' => bool, 'qr' => bool, 'manual' => ['enabled' => bool, 'upi_id' => string, 'name' => string]]
+     * @return array ['amount' => float|null, 'checkout' => bool, 'qr' => bool]
      */
     public static function options($purpose = null, $requestedAmount = 0)
     {
-        $upi = trim((string) (new WebSetting())->getSettingBykey('company_upi_id'));
-
         $amount = $purpose !== null ? self::amountFor($purpose, $requestedAmount) : null;
 
         return [
             'amount' => is_float($amount) ? $amount : null,
             'checkout' => Razorpay::isConfigured(),
             'qr' => Razorpay::isConfigured(),
-            'manual' => ['enabled' => $upi !== '', 'upi_id' => $upi, 'name' => trim((string) (new WebSetting())->getSettingBykey('company_upi_name')) ?: 'Rubia Services'],
         ];
     }
     // [doc:end] options
@@ -389,73 +386,6 @@ class PaymentOrders
         return strtotime($row['created_on']) + 7200 < time() ? 'expired' : 'waiting';
     }
 
-    // [doc:start] manualSubmit - The last resort when the gateway is down: the driver paid the company UPI id and sends the UTR (bank reference) number.
-    /**
-     * The last resort when the gateway is down: the driver paid the company UPI id and sends the UTR (bank reference) number.
-     * Nothing is credited yet: the payment waits as "review" in the dashboard (Payments screen) until the company checks its bank
-     * statement and approves it with one tap.
-     *
-     * @return array ['ok' => bool, 'error' => string, 'id' => int]
-     */
-    public static function manualSubmit($userId, $purpose, $requestedAmount, $utr)
-    {
-        $utr = strtoupper(trim((string) $utr));
-        if (!preg_match('/^[A-Z0-9]{10,30}$/', $utr)) {
-            return ['ok' => false, 'error' => 'Enter the UTR / reference number of the payment (10 to 30 letters and digits).'];
-        }
-        if (!self::options()['manual']['enabled']) {
-            return ['ok' => false, 'error' => 'Paying by UPI QR is not set up yet.'];
-        }
-        $user = User::findOne((int) $userId);
-        $amount = self::amountFor($purpose, $requestedAmount);
-        if (!$user || !is_float($amount)) {
-            return ['ok' => false, 'error' => $user ? $amount : 'User not found'];
-        }
-        if ($purpose === self::JOINING_FEE && (int) $user->is_paid_joining_fee === 1) {
-            return ['ok' => false, 'error' => 'The joining fee is already paid.'];
-        }
-        if ((new \yii\db\Query())->from('payment_order')->where(['gateway' => 'manual', 'gateway_payment_id' => $utr])->exists()) {
-            return ['ok' => false, 'error' => 'This reference number was already submitted.'];
-        }
-        Yii::$app->db->createCommand()->insert('payment_order', [
-            'user_id' => (int) $userId,
-            'purpose' => $purpose,
-            'amount' => $amount,
-            'currency' => 'INR',
-            'gateway' => 'manual',
-            'gateway_order_id' => 'M' . bin2hex(random_bytes(8)),
-            'gateway_payment_id' => $utr,
-            'status' => 'review',
-            'applied' => 0,
-            'note' => 'UTR ' . $utr,
-            'created_on' => date('Y-m-d H:i:s'),
-        ])->execute();
-
-        return ['ok' => true, 'id' => (int) Yii::$app->db->getLastInsertID()];
-    }
-    // [doc:end] manualSubmit
-
-    // [doc:start] manualDecision - Manual Decision
-    /**
-     * @return string approved | rejected | missing
-     */
-    public static function manualDecision($id, $approve)
-    {
-        $row = (new \yii\db\Query())->from('payment_order')->where(['id' => (int) $id, 'gateway' => 'manual', 'status' => 'review'])->one();
-        if (!$row) {
-            return 'missing';
-        }
-        if ($approve) {
-            self::markPaid($row, $row['gateway_payment_id']);
-
-            return 'approved';
-        }
-        Yii::$app->db->createCommand()->update('payment_order', ['status' => 'rejected'], ['id' => $row['id'], 'status' => 'review'])->execute();
-
-        return 'rejected';
-    }
-    // [doc:end] manualDecision
-
     // [doc:start] recentlyPaid - True when this partner has a payment of this purpose that was paid in the last 30 minutes (already applied). Used by the.
     /**
      * True when this partner has a payment of this purpose that was paid in the last 30 minutes (already applied). Used by the
@@ -467,14 +397,6 @@ class PaymentOrders
             ->andWhere(['>=', 'paid_on', date('Y-m-d H:i:s', time() - 1800)])->exists();
     }
     // [doc:end] recentlyPaid
-
-    // [doc:start] manualStatus - Manual Status
-    public static function manualStatus($userId)
-    {
-        return (new \yii\db\Query())->select(['id', 'purpose', 'amount', 'status', 'created_on'])->from('payment_order')
-            ->where(['user_id' => (int) $userId, 'gateway' => 'manual'])->orderBy(['id' => SORT_DESC])->limit(10)->all();
-    }
-    // [doc:end] manualStatus
 
     private static function row($column, $value, $gateway = 'razorpay')
     {
@@ -515,7 +437,7 @@ class PaymentOrders
             $w->driver_id = $uid;
             $w->amount = (int) round($row['amount']);
             $w->payment_type = \app\modules\admin\models\DriverWallet::payment_type_credit;
-            $w->method_reason = 'Amount credit ' . $row['amount'] . ' (' . ($row['gateway'] === 'manual' ? 'UPI, approved by the company' : ucfirst($row['gateway']) . ' ' . $row['gateway_order_id']) . ')';
+            $w->method_reason = 'Amount credit ' . $row['amount'] . ' (' . (ucfirst($row['gateway']) . ' ' . $row['gateway_order_id']) . ')';
             $w->status = \app\modules\admin\models\DriverWallet::STATUS_SUCCESS;
             $w->save(false);
         } elseif ($row['purpose'] === self::SUBSCRIPTION) {

@@ -97,8 +97,6 @@ class SettingGuide
             'open_money_key' => ['OpenMoney (payouts)', self::PRIVATE_ID, 'OpenMoney dashboard > Developers: the API key.'],
             'open_money_secret' => ['OpenMoney (payouts)', self::SECRET, 'OpenMoney dashboard > Developers: the secret that goes with the key.'],
             // Company UPI
-            'company_upi_id' => ['Company UPI QR (when the payment gateway is down)', self::PLAIN, 'Your UPI id, for example name@bank. Partners see it as a QR to pay when Razorpay does not work. Empty = switched off.'],
-            'company_upi_name' => ['Company UPI QR (when the payment gateway is down)', self::PLAIN, 'The name shown with the QR.'],
             // Notifications
             'onesignal_api_key' => ['Push notifications (OneSignal)', self::SECRET, 'OneSignal dashboard > Settings > Keys & IDs: the REST API Key.'],
             'onesignal_app_id' => ['Push notifications (OneSignal)', self::PRIVATE_ID, 'OneSignal dashboard > Settings > Keys & IDs: the App ID.'],

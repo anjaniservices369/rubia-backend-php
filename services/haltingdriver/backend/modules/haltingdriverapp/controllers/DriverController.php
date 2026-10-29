@@ -175,8 +175,6 @@ class DriverController extends BKController
                             'payment-options',
                             'razorpay-create-qr',
                             'razorpay-qr-status',
-                            'manual-payment-submit',
-                            'manual-payment-status',
 
 
                         ],
@@ -254,8 +252,6 @@ class DriverController extends BKController
                             'payment-options',
                             'razorpay-create-qr',
                             'razorpay-qr-status',
-                            'manual-payment-submit',
-                            'manual-payment-status',
 
                         ],
 
@@ -1392,8 +1388,7 @@ public function actionApplyReferral()
     // [doc:start] actionPaymentOptions - /api/driver/payment-options - POST|GET /api/driver/payment-options (optional: purpose, amount - then the reply carries the amount the server will charge).
     /**
      * POST|GET /api/driver/payment-options   (optional: purpose, amount - then the reply carries the amount the server will charge)
-     * OK: details = {amount, checkout, qr, manual: {enabled, upi_id, name}}. The app tries Razorpay checkout first, offers the automated QR when
-     * checkout does not work, and the manual UPI QR (with the UTR number) when the gateway itself is down.
+     * OK: details = {amount, checkout, qr}. The app uses the Razorpay or Cashfree checkout.
      */
     public function actionPaymentOptions()
     {
@@ -1419,7 +1414,7 @@ public function actionApplyReferral()
      * POST /api/driver/razorpay-create-qr   purpose (joining_fee | wallet_topup | subscription), amount (wallet_topup only)
      * OK: details = {id, image_url, amount, expires_at, purpose}. Show image_url, then call razorpay-qr-status every 4 seconds: when the driver pays
      * with any UPI app the payment is confirmed and applied (fee marked paid, wallet credited, plan started) with nothing else to do.
-     * NOK when Razorpay refuses (for example the UPI QR feature is not switched on for the account): use the manual payment instead.
+     * NOK when Razorpay refuses (for example the UPI QR feature is not switched on for the account).
      */
     public function actionRazorpayCreateQr()
     {
@@ -1474,60 +1469,6 @@ public function actionApplyReferral()
         return $this->sendJsonResponse($data);
     }
     // [doc:end] actionRazorpayQrStatus
-
-    // [doc:start] actionManualPaymentSubmit - /api/driver/manual-payment-submit - POST /api/driver/manual-payment-submit purpose, amount (wallet_topup only), utr.
-    /**
-     * POST /api/driver/manual-payment-submit   purpose, amount (wallet_topup only), utr
-     * Nothing is credited yet: the payment waits for the company to check its bank statement and approve it in the dashboard
-     * (Payments screen). OK: details = {id}. Ask manual-payment-status to see when it is approved.
-     */
-    public function actionManualPaymentSubmit()
-    {
-        $data = [];
-        $headers = isset(\Yii::$app->request->headers['auth_code']) ? \Yii::$app->request->headers['auth_code'] : Yii::$app->request->getQueryParam('auth_code');
-        $user_id = (new AuthSettings())->getAuthSession($headers);
-        if (empty($user_id)) {
-            $data['status'] = self::API_NOK;
-            $data['error'] = 'User Not Found';
-
-            return $this->sendJsonResponse($data);
-        }
-        $post = Yii::$app->request->post();
-        $r = \app\modules\payments\services\PaymentOrders::manualSubmit($user_id, $post['purpose'] ?? '', $post['amount'] ?? 0, $post['utr'] ?? '');
-        if ($r['ok']) {
-            $data['status'] = self::API_OK;
-            $data['details'] = ['id' => $r['id']];
-        } else {
-            $data['status'] = self::API_NOK;
-            $data['error'] = $r['error'];
-        }
-
-        return $this->sendJsonResponse($data);
-    }
-    // [doc:end] actionManualPaymentSubmit
-
-    // [doc:start] actionManualPaymentStatus - /api/driver/manual-payment-status - POST|GET /api/driver/manual-payment-status.
-    /**
-     * POST|GET /api/driver/manual-payment-status
-     * OK: details = list of {id, purpose, amount, status, created_on}, newest first.
-     */
-    public function actionManualPaymentStatus()
-    {
-        $data = [];
-        $headers = isset(\Yii::$app->request->headers['auth_code']) ? \Yii::$app->request->headers['auth_code'] : Yii::$app->request->getQueryParam('auth_code');
-        $user_id = (new AuthSettings())->getAuthSession($headers);
-        if (empty($user_id)) {
-            $data['status'] = self::API_NOK;
-            $data['error'] = 'User Not Found';
-
-            return $this->sendJsonResponse($data);
-        }
-        $data['status'] = self::API_OK;
-        $data['details'] = \app\modules\payments\services\PaymentOrders::manualStatus($user_id);
-
-        return $this->sendJsonResponse($data);
-    }
-    // [doc:end] actionManualPaymentStatus
 
     // [doc:start] actionPayJoiningFee - /api/driver/pay-joining-fee - The driver reports the joining fee paid through Razorpay.
     /**

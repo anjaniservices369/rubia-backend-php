@@ -58,20 +58,8 @@ class PaymentsController extends Controller
      */
     public function actionIndex()
     {
-        $post = Yii::$app->request->post();
-        if ($post) {
-            foreach (['company_upi_id' => 'Company UPI id for QR payments (fallback when the gateway is down)', 'company_upi_name' => 'Name shown with the company UPI QR'] as $k => $n) {
-                if (array_key_exists($k, $post)) {
-                    $this->save($k, $n, trim($post[$k]), 14);
-                }
-            }
-            Yii::$app->session->setFlash('success', 'Saved.');
-
-            return $this->refresh();
-        }
         $setting = new WebSetting();
         $orders = (new Query())->from('payment_order')->orderBy(['id' => SORT_DESC])->limit(50)->all();
-        $review = (new Query())->from('payment_order')->where(['gateway' => 'manual', 'status' => 'review'])->orderBy(['id' => SORT_ASC])->all();
 
         return $this->render('index', [
             'keyId' => Razorpay::setting('key_id'),
@@ -83,28 +71,8 @@ class PaymentsController extends Controller
             'enforce' => (string) $setting->getSettingBykey('enforce_driver_onboarding') === '1',
             'webhookUrl' => Yii::$app->urlManager->createAbsoluteUrl('/api/driver/razorpay-webhook'),
             'orders' => $orders,
-            'review' => $review,
-            'upiId' => (string) $setting->getSettingBykey('company_upi_id'),
-            'upiName' => (string) $setting->getSettingBykey('company_upi_name'),
         ]);
     }
     // [doc:end] actionIndex
 
-    // [doc:start] actionDecide - /admin/payments/decide - Approve (credits once) or reject a payment a partner made by the company UPI QR, after checking the bank statement.
-    /**
-     * Approve (credits once) or reject a payment a partner made by the company UPI QR, after checking the bank statement.
-     * POST only: id and approve (1 or 0).
-     */
-    public function actionDecide()
-    {
-        $req = Yii::$app->request;
-        if (!$req->isPost) {
-            throw new \yii\web\MethodNotAllowedHttpException();
-        }
-        $result = \app\modules\payments\services\PaymentOrders::manualDecision((int) $req->post('id'), (int) $req->post('approve') === 1);
-        Yii::$app->session->setFlash($result === 'missing' ? 'error' : 'success', $result === 'approved' ? 'Approved and credited.' : ($result === 'rejected' ? 'Rejected.' : 'That payment is not waiting for approval.'));
-
-        return $this->redirect(['index']);
-    }
-    // [doc:end] actionDecide
 }
