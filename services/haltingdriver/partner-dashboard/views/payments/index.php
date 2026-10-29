@@ -35,6 +35,10 @@ $badge = ['paid' => 'success', 'created' => 'secondary', 'failed' => 'danger', '
             <?= Html::a('Integrations &rarr; Razorpay', ['/admin/integrations/view', 'id' => 'razorpay']) ?>.
             Mode: <strong><?= $mode ? Html::encode($mode) : 'not configured' ?></strong><?= $fromEnv ? ' (secret from the server environment)' : '' ?>.</p>
 
+        <h5>Withdrawals</h5>
+        <p class="text-muted">Drivers' withdrawal requests, paid to the bank details they registered:
+            <?= Html::a('Open Withdrawals &rarr;', ['/admin/payments/withdrawals']) ?>.</p>
+
         <h5>Partner onboarding</h5>
         <p class="text-muted">Joining fee: <strong>&#8377;<?= Html::encode($fee) ?></strong> &middot; onboarding is <strong><?= $enforce ? 'enforced' : 'not enforced' ?></strong>.
             Change them in <?= Html::a('Integrations &rarr; Driver settings', ['/admin/integrations/view', 'id' => 'driver_rules']) ?>.</p>

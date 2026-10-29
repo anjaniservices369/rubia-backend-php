@@ -898,7 +898,12 @@ public function actionUserVerifyProfile(){
 		$model = User::find()->where([
 			'id' => $post['user_id'],
 		])->one();
-		$driverReferralEarning = DriverReferralEarnings::find()->where(['driver_id'=>$model->referal_id])->one();
+		if (empty($model)) {
+			$data['message'] = "Not Updated";
+			return $data;
+		}
+		// Only a driver who was referred has a referral record; for everyone else this stays null (approving used to crash on it).
+		$driverReferralEarning = !empty($model->referal_id) ? DriverReferralEarnings::find()->where(['driver_id'=>$model->referal_id])->one() : null;
 		if(!empty($model)){
 
 			$model->profile_verified = $post['status'];    
@@ -908,14 +913,17 @@ public function actionUserVerifyProfile(){
 			$data['message'] = "Updated";
 			$data['id'] = $model->profile_verified ;
 
+			$body = 'Profile verification status updated';
 			if($model->profile_verified==User::profile_verified_yes){
 				
+				if (!empty($driverReferralEarning)) {
 				$driverReferralEarning->status = DriverReferralEarnings::STATUS_ACTIVE;
 				$driverReferralEarning->save();
+				}
 				
 				$one_time_use = \Yii::$app->session->get('one_time_use', false);
 				
-				if(!$one_time_use){
+				if(!empty($driverReferralEarning) && !$one_time_use){
 					$driverWallet = new DriverWallet();
 					$driverWallet->driver_id = $driverReferralEarning->driver_id;
 					$driverWallet->amount = (float)$driverReferralEarning->earnings;

@@ -129,6 +129,7 @@ class DriverController extends BKController
                             'add-balance',
                             'transaction-list',
                             'withdraw',
+                            'withdraw-info',
                             'available-balance',
                             'driver-status',
                             'upload-profile-picture',
@@ -206,6 +207,7 @@ class DriverController extends BKController
                             'add-balance',
                             'transaction-list',
                             'withdraw',
+                            'withdraw-info',
                             'available-balance',
                             'driver-status',
                             'upload-profile-picture',
@@ -1844,6 +1846,49 @@ public function actionApplyReferral()
     }
     // [doc:end] actionTransactionList
 
+    // [doc:start] actionWithdrawInfo - /api/driver/withdraw-info - What the withdraw screen shows: balance, minimum and the bank the money goes to.
+    /**
+     * POST|GET /api/driver/withdraw-info
+     * OK: details = {balance, min_withdraw, bank: {account_holder_name, bank_name, account_number_masked, ifsc, upi} | null,
+     *               pending: [{id, amount, created_on}]}. The money is paid to this bank; null means the driver must add bank details first.
+     */
+    public function actionWithdrawInfo()
+    {
+        $data = [];
+        $headers = isset(\Yii::$app->request->headers['auth_code']) ? \Yii::$app->request->headers['auth_code'] : Yii::$app->request->getQueryParam('auth_code');
+        $user_id = (new AuthSettings())->getAuthSession($headers);
+        if (empty($user_id)) {
+            $data['status'] = self::API_NOK;
+            $data['error'] = 'User Not Found';
+
+            return $this->sendJsonResponse($data);
+        }
+        $bank = DriverBankDetails::find()->where(['driver_id' => $user_id])->one();
+        $pending = DriverWallet::find()->where(['driver_id' => $user_id, 'payment_type' => DriverWallet::payment_type_debit, 'status' => DriverWallet::STATUS_PENDING])
+            ->orderBy(['id' => SORT_DESC])->limit(5)->all();
+        $list = [];
+        foreach ($pending as $w) {
+            $list[] = ['id' => (int) $w->id, 'amount' => (int) $w->amount, 'created_on' => (string) $w->created_on];
+        }
+        $acct = $bank ? (string) $bank->account_number : '';
+        $data['status'] = self::API_OK;
+        $data['details'] = [
+            'balance' => DriverWallet::availableBalance($user_id, \app\modules\geo\services\ServiceModules::DRIVER),
+            'min_withdraw' => (int) (new \app\modules\admin\models\WebSetting())->getSettingBykey('min_withdraw'),
+            'bank' => ($bank && $acct !== '') ? [
+                'account_holder_name' => (string) $bank->account_holder_name,
+                'bank_name' => (string) $bank->bank_name,
+                'account_number_masked' => str_repeat('*', max(0, strlen($acct) - 4)) . substr($acct, -4),
+                'ifsc' => (string) $bank->ifsc,
+                'upi' => (string) $bank->upi,
+            ] : null,
+            'pending' => $list,
+        ];
+
+        return $this->sendJsonResponse($data);
+    }
+    // [doc:end] actionWithdrawInfo
+
     // [doc:start] actionWithdraw - /api/driver/withdraw - Withdraw
     public function actionWithdraw()
     {
@@ -1868,6 +1913,21 @@ public function actionApplyReferral()
                         $user->id,
                         \app\modules\geo\services\ServiceModules::DRIVER
                     );
+                    // The money is always paid to the bank account the driver registered; without one there is nowhere to send it.
+                    $bank = DriverBankDetails::find()->where(['driver_id' => $user_id])->one();
+                    $minWithdraw = (int) (new \app\modules\admin\models\WebSetting())->getSettingBykey('min_withdraw');
+                    if (empty($bank) || trim((string) $bank->account_number) === '' || trim((string) $bank->ifsc) === '') {
+                        $data['status'] = self::API_NOK;
+                        $data['error'] = 'Add your bank details first (Add Details > Bank Details); withdrawals are paid to that account.';
+
+                        return $this->sendJsonResponse($data);
+                    }
+                    if ($amount > 0 && $minWithdraw > 0 && $amount < $minWithdraw) {
+                        $data['status'] = self::API_NOK;
+                        $data['error'] = 'The minimum withdrawal is ' . $minWithdraw . ' rupees.';
+
+                        return $this->sendJsonResponse($data);
+                    }
                     // The whole balance can be withdrawn (it used to have to be strictly more than the amount).
                     if ($amount > 0 && $availableBalance >= $amount) {
                         $driver_wallet = new DriverWallet();
@@ -1875,8 +1935,10 @@ public function actionApplyReferral()
                         $driver_wallet->amount = $amount;
                         $driver_wallet->payment_type =
                             DriverWallet::payment_type_debit;
-                        $driver_wallet->method_reason =
-                            'Amount withdraw ' . $amount;
+                        // The bank is written into the entry (account masked) so the request stays readable even if the driver edits the details later.
+                        $acct = (string) $bank->account_number;
+                        $driver_wallet->method_reason = 'Withdrawal ' . $amount . ' to ' . $bank->bank_name . ' A/C ****' . substr($acct, -4)
+                            . ' IFSC ' . $bank->ifsc . (trim((string) $bank->upi) !== '' ? ' UPI ' . $bank->upi : '') . ' (waiting for the office to pay)';
                         $driver_wallet->status = DriverWallet::STATUS_PENDING;
                         if ($driver_wallet->save(false)) {
                             $data['status'] = self::API_OK;
