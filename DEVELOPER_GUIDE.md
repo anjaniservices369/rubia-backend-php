@@ -456,3 +456,15 @@ saves with `savePincodeMap` and has a "Remove the pincode map" button.
 
 ## 13. Account deletion
 `app/components/AccountDeletion.php` (`blocker`, `deleteUser`, `logWebRequest`); endpoints `POST api/user/delete-account` and `POST api/driver/delete-account` (auth_code header); public page `GET/POST /account-deletion` (`SiteController::actionAccountDeletion`, view `views/site/account-deletion.php`); table `account_deletion_request` (migration 036). `deleteUser` sets `status = 2`, blanks the personal columns, deletes the phone login link (`auth` row, otherwise the number would log back into the deleted account), sessions, saved places and emergency contacts, and refuses while a booking is in status 1, 2, 4, 5 or 6. Web requests are only logged for support to process (nobody is signed in on that page).
+
+## 14. Running everything on a development machine (28 Oct 2026)
+
+- Database: MySQL on port 3308 (`app/config/secrets.php`, database `rubia_website`).
+- Backend: from `app/`, `php -S 127.0.0.1:8080 -t web <router>` where the router serves a file from `web/` or `app/` (themes live in `app/themes`) when it exists and otherwise requires `web/index.php`. Serving with `-t .` and `index.php` as the router sends every stylesheet and script through Yii (HTTP 500, page without styles). A router file must not start with a BOM, or Yii fails with "Headers already sent".
+- PHP started for https calls needs a CA bundle: `-d curl.cainfo=<cacert.pem> -d openssl.cafile=<cacert.pem>`; otherwise Google calls fail with "unable to get local issuer certificate".
+- Test login (no SMS): start the server with `OTP_TEST_NUMBERS=<comma separated numbers>` and `OTP_TEST_CODE=<code>`; it only works with `YII_ENV=dev` and from 127.0.0.1. Check whether a number already exists in `user` before using it as a "new" registration, or you log into (and can overwrite) that account.
+- Admin sign-in needs `user_role = admin` **and** the email in `superAdminEmails` (`app/config/params.php`). A rate-limit of 10 failed sign-ins per 15 minutes per IP is kept in the file cache (`php yii cache/flush-all` clears it).
+- Google keys: `GoogleKeys::serverKeys()` reads Integrations first, then the environment, then `secrets.php`. `DrivingDistance::googleRoute` tries each key with Routes, then Directions, then Distance Matrix; a key only needs one of them.
+- Flutter web builds: `flutter build web --release` in each app folder gives `build/web` (git-ignored); serve it with any static server. Payment, location and maps plugins are limited in a browser, and the API must allow the page's origin (CORS).
+
+Known debt found in this run: `Booking::calculateEstimate` calls `strtotime($this->end_time)` while `end_time` is still null. On PHP 8.1+ with deprecations reported, Yii turns that into an exception and the app answers "Fares are not set up for this city and ride type yet." (the real reason is only in `runtime/logs/app.log`). Run the server with deprecations off (`error_reporting=E_ALL & ~E_DEPRECATED`, as production normally does) or guard the null. End-to-end check done on 28 Oct (register, profile, estimate, booking, cancel, dispatch cron): see section 9.
