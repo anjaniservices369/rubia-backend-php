@@ -3,6 +3,7 @@
 /assets
 /tests/*
 !/tests/booking_expiry_test.php
+!/tests/dashboard_access_test.php
 /node_modules
 config/db.php
 /assets

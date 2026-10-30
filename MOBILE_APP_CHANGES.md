@@ -11,6 +11,9 @@ Three things changed on the server that the apps can see:
 
 Nothing else in the request/response shapes changed.
 
+Dashboard sign-in/role/layout fixes are dashboard-only and do not change mobile authentication
+or API response shapes. See [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md) for operator workflows.
+
 ## 30 October 2026 - booking workflow fixes and device retest
 
 This update concerns the halting-driver service, not Taxi/Bike/Auto:

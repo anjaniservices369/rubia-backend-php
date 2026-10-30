@@ -28,6 +28,31 @@ php yii db/down --yes      # revert the most recently applied script
 | 013 | `013_service_billing` | Billing of each service on its own: `service_billing_profile` (legal name, GSTIN, PAN, address, invoice prefix per service), `service_invoice_counter` (own number series per financial year) and `service_invoice` (one invoice per completed ride, with CGST / SGST split). |
 | 014 | `014_separate_customer_side` | Customer wallet, coupons, coupon use and referral rewards become per service (`module` columns, history filled as the halting drivers service), and per-service referral reward settings. |
 | 015 | `015_user_uuid` | Every account gets a UUID (`user.uuid`, unique; trigger sets it on insert; existing accounts backfilled): the identity that is the same in every service and the user app. |
+| 016 | `016_razorpay_payments` | Razorpay payment support. |
+| 017 | `017_cashfree_settings` | Cashfree payment settings. |
+| 018 | `018_media_object_storage` | Media object-storage support. |
+| 019 | `019_company_upi` | Company UPI settings. |
+| 020 | `020_documents_for_life` | Driver document validity settings. |
+| 021 | `021_documents_bucket_key` | Document bucket/key storage fields. |
+| 022 | `022_integration_keys` | Integration-key storage. |
+| 023 | `023_media_booking` | Booking linkage for media records. |
+| 024 | `024_expire_ended_subscriptions` | Expiry of ended subscriptions. |
+| 025 | `025_admin_audit_log` | Admin audit-log storage. |
+| 026 | `026_twilio_rename` | Twilio setting rename. |
+| 027 | `027_twilio_email_api` | Twilio email API settings. |
+| 028 | `028_twilio_api_key` | Twilio API key setting. |
+| 029 | `029_gmail_smtp` | Gmail SMTP settings. |
+| 030 | `030_email_smtp` | Email SMTP settings. |
+| 031 | `031_page_app_key` | App key for page records. |
+| 032 | `032_booking_route_log` | Booking route-log storage. |
+| 033 | `033_booking_radius_alert` | Booking radius-alert settings. |
+| 034 | `034_booking_live_track` | Booking live-tracking storage. |
+| 035 | `035_pincode_map` | Pincode map support. |
+| 036 | `036_account_deletion_request` | Account-deletion request records. |
+
+This index is a short orientation, not a substitute for reviewing the SQL. Always read the
+exact `.up.sql` and `.down.sql` files for the intended schema before applying a change. Some
+later migrations do not have a down script; `db/down` cannot reverse those changes.
 
 ### 002 in detail
 

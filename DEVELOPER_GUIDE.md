@@ -6,6 +6,17 @@ App root: `app/`. Business-level description: `BUSINESS_GUIDE.md`. Deployment: `
 Other docs: `MODULES.md` (module map), `MEDIA_STORAGE.md` (uploads), `MOBILE_APP_CHANGES.md` (what the apps must do),
 `app/database/README.md` (migrations).
 
+Dashboard workflows, role boundaries and live-check limitations are in
+[DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md). The workspace
+[Rubia Dashboard agent](.github/agents/rubia-dashboard.agent.md) focuses on admin UI and registry checks.
+The [Dashboard Developer and Database Guide](DASHBOARD_DEVELOPER_GUIDE.md) covers service/schema
+boundaries, migration safety and dashboard testing; the
+[Dashboard Owner Manual](DASHBOARD_OWNER_MANUAL.md) covers operational and database governance.
+Dashboard access regressions run with `php app/tests/dashboard_access_test.php` without database writes.
+Guest admin URLs redirect to sign-in and preserve the deep link; login/admin-login use a dedicated
+Bootstrap layout instead of the storefront's load-dependent wrapper. Global operator access includes
+sub-admins/managers/franchise, but controller-level restrictions remain authoritative.
+
 ## Latest cross-project verification - 2026-10-30
 
 Booking **1698** was created in the Realme customer app and accepted/completed in the Redmi
@@ -102,8 +113,9 @@ Back office: `modules/admin` (controllers, views, models, search models). All Ac
 - `OtpService::isBypassed()` lets configured test numbers skip the OTP **only when `YII_ENV` is dev**.
 - Roles: `User::ROLE_*` (`User`, `Driver`, `taxi`, `admin`, `Subadmin`, `Manager`, `city franchise`, ...). Account
   status: `STATUS_ACTIVE=10`, `STATUS_BLOCKED=0`, `STATUS_INACTIVE=1`, `STATUS_DELETED=2`.
-- Dashboard access: `config/rbac.php` returns 404 for `/admin/*` to anyone who is not admin/franchise;
-  controllers add `AccessControl` per role (`User::isAdmin()`, `isSubAdmin()`, `isManager()`, `isFranchise()`).
+- Dashboard access: `config/rbac.php` sends signed-out HTML requests for `/admin/*` to sign-in with
+  their destination preserved. Mobile-only roles remain blocked; controllers add `AccessControl`
+  per role (`User::isAdmin()`, `isSubAdmin()`, `isManager()`, `isFranchise()`).
 
 ## 3. Driver-service booking: states and who may move them
 

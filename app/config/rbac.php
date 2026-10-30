@@ -17,10 +17,13 @@ return [
 				'allow'   => false,
 				'controllers' => ['admin/*'],
 				'matchCallback' => function ($rule, $action) {
-					$access = User::isAdmin() || User::isFranchise();
+					$access = User::isAdmin() || User::isSubAdmin() || User::isManager() || User::isFranchise();
 					return !$access;
 				},
 				'denyCallback' => function ($null, $action) {
+					if (\Yii::$app->user->isGuest) {
+						return \Yii::$app->user->loginRequired();
+					}
 					\Yii::$app->errorHandler->errorAction = 'site/error';
 					throw new NotFoundHttpException('Page not found.');
 				}

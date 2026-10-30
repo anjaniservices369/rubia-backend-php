@@ -248,9 +248,9 @@ class SiteController extends Controller
 	}
 
 	public function actionLogin(){
-		
+		$this->layout = 'main-login';
 		if (!Yii::$app->user->isGuest) {
-            return $this->redirect('index');
+            return $this->goBack($this->dashboardLandingUrl());
         }
 		$model = new LoginForm ();
 		if (Yii::$app->request->isAjax && $model->load(Yii::$app->request->post())) {
@@ -264,12 +264,7 @@ class SiteController extends Controller
 			//if($user_verification['status'] == User::STATUS_ACTIVE){
 				if($model->login()){
 					
-					if(\Yii::$app->user->identity->user_role==User::ROLE_ADMIN || \Yii::$app->user->identity->user_role==User::ROLE_FRANCHISE ){
-						return $this->redirect(['/admin/dashboard']);
-					}
-					//var_dump($model); exit;
-					
-					return $this->goBack();
+					return $this->goBack($this->dashboardLandingUrl());
 				}
 			/*}else{
                 Yii::$app->session->setFlash('error','Please Activate Your  Account');
@@ -282,24 +277,33 @@ class SiteController extends Controller
 
 
 	public function actionAdminLogin() {
-		//$this->layout = '//main-login';
+		$this->layout = 'main-login';
 		if (! Yii::$app->user->isGuest) {
-			return $this->goHome ();
+			return $this->goBack($this->dashboardLandingUrl());
 		}
 		
 		$model = new LoginForm ();
 		$model->scenario = 'admin';
 		if ($model->load ( Yii::$app->request->post () ) ) {
 				if($model->login ()){
-					if(\Yii::$app->user->identity->user_role==User::ROLE_ADMIN){
-						return $this->redirect(['/admin/dashboard']);
-					}
-					return $this->goBack();
+					return $this->goBack($this->dashboardLandingUrl());
 				}
 		}
 		return $this->render ( '/site/admin-login', [ 
 				'model' => $model 
 		] );
+	}
+
+	private function dashboardLandingUrl()
+	{
+		if (User::isAdmin() || User::isSubAdmin() || User::isFranchise()) {
+			return ['/admin/dashboard'];
+		}
+		if (User::isManager()) {
+			return ['/admin/booking/index'];
+		}
+
+		return Yii::$app->homeUrl;
 	}
 
 	

@@ -4,7 +4,8 @@ use yii\helpers\Html;
 /* @var $this \yii\web\View */
 /* @var $content string */
 
-dmstr\web\AdminLteAsset::register ( $this );
+Yii::$app->assetManager->bundles['yii\web\JqueryAsset'] = [];
+yii\bootstrap4\BootstrapAsset::register($this);
 ?>
 <?php $this->beginPage() ?>
 <!DOCTYPE html>
@@ -20,7 +21,9 @@ dmstr\web\AdminLteAsset::register ( $this );
 
 <?php $this->beginBody() ?>
 
-    <?= $content ?>
+    <main class="container py-4">
+        <?= $content ?>
+    </main>
 
 <?php $this->endBody() ?>
 </body>

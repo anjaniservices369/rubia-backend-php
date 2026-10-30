@@ -2,6 +2,11 @@
 
 For the owner. No technical knowledge needed. Everything here describes what the system does today.
 
+For dashboard sign-in, menus, booking/financial checks and troubleshooting, see the
+[Dashboard Guide](DASHBOARD_GUIDE.md).
+Owners and operators can use the [Dashboard Owner Manual](DASHBOARD_OWNER_MANUAL.md);
+developers can use the [Dashboard Developer and Database Guide](DASHBOARD_DEVELOPER_GUIDE.md).
+
 ## Latest device verification - 30 October 2026
 
 The customer app on a Realme and the updated driver app on a Redmi completed booking **1698**
