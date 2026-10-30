@@ -148,6 +148,7 @@ use app\modules\admin\models\DriverEarnings;
                             )
                                 ? $model->car_model
                                 : '' ?></div>
+                            <div class="mb-1">Vehicle Number: <?= Html::encode((string) ($model->vehicle_number ?? '')) ?></div>
                           
                         </div>
                     </div>
@@ -377,6 +378,7 @@ if($model->status == Booking::STATUS_RIDE_COMPLETED){ ?>
                  <th>Ride Amount(Excluding GST)</th>
                  <th>Admin Percentage</th>
                  <th>Admin Earning</th>
+                 <th>Driver Net Earning</th>
               
                
             </tr>
@@ -391,6 +393,7 @@ if($model->status == Booking::STATUS_RIDE_COMPLETED){ ?>
                 <td><?= $driverEarnings->total_amount - $price_details['gst'] ?></td>
                 <td><?= $driverEarnings->admin_per ?></td>
                 <td><?= $driverEarnings->admin_earning ?></td>
+                <td><?= Html::encode((string) ($driverEarnings->driver_earning ?? '')) ?></td>
               
             </tr>
         </tbody>

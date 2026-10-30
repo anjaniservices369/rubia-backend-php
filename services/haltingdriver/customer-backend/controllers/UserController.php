@@ -359,7 +359,7 @@ class UserController extends BKController
                 // way, arrived, started) is refused. Bookings whose pickup time has already passed are cancelled first.
                 if ($saveBooking == 'true') {
                     // bookings whose pickup time has passed without a driver are closed first, so they do not block
-                    \app\modules\dispatch\services\BookingExpiry::run();
+                    \app\modules\dispatch\services\BookingExpiry::run(200, ['user_id' => $user_id]);
                     $activeId = Booking::find()->select('id')
                         ->where(['user_id' => $user_id])
                         ->andWhere(['status' => [
@@ -369,6 +369,10 @@ class UserController extends BKController
                             Booking::STATUS_ARRIVED_LOCATION,
                             Booking::STATUS_START_RIDE,
                         ]])
+                        ->andWhere(['or',
+                            ['<>', 'status', Booking::STATUS_WAITING_FOR_DRIVER],
+                            \app\modules\dispatch\services\BookingExpiry::availablePickupCondition(),
+                        ])
                         ->orderBy(['id' => SORT_DESC])
                         ->scalar();
                     if ($activeId) {
@@ -1041,6 +1045,7 @@ class UserController extends BKController
         // WHICH BOOKINGS: still waiting for a driver and created in the last 24 hours.
         $bookings = Booking::find()
             ->where(['status' => Booking::STATUS_WAITING_FOR_DRIVER])
+            ->andWhere(\app\modules\dispatch\services\BookingExpiry::availablePickupCondition())
             ->andWhere(['>=', 'created_on', date('Y-m-d H:i:s', time() - 86400)])
             ->all();
         if (empty($bookings)) {
@@ -1478,6 +1483,7 @@ class UserController extends BKController
             try {
                 $booking_id = !empty($post['booking_id'])? $post['booking_id']: '';
                 if (!empty($booking_id)) {
+                    \app\modules\dispatch\services\BookingExpiry::run(1, ['id' => $booking_id]);
                     $booking = Booking::find()
                         ->where(['id' => $booking_id])
                         ->one();
@@ -1759,6 +1765,7 @@ class UserController extends BKController
                     : '';
 
                 if (!empty($booking_id)) {
+                    \app\modules\dispatch\services\BookingExpiry::run(1, ['id' => $booking_id]);
                     $booking = Booking::find()
                         ->where(['id' => $booking_id])
                         ->one();

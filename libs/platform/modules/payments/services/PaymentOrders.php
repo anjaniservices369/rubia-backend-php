@@ -149,7 +149,7 @@ class PaymentOrders
     }
     // [doc:end] confirm
 
-    // [doc:start] createCashfree - Create Cashfree
+    // [doc:start] createCashfree - The same as create(), for Cashfree: the server decides the amount, creates the Cashfree order and keeps a payment_order row.
     /**
      * The same as create(), for Cashfree: the server decides the amount, creates the Cashfree order and keeps a payment_order row
      * (gateway "cashfree"). The app opens Cashfree's checkout with order_id and payment_session_id.
@@ -206,7 +206,7 @@ class PaymentOrders
     }
     // [doc:end] createCashfree
 
-    // [doc:start] confirmCashfree - Confirm Cashfree
+    // [doc:start] confirmCashfree - The app says the Cashfree checkout finished. Nothing the app sends is trusted: the order is read back from Cashfree and must be.
     /**
      * The app says the Cashfree checkout finished. Nothing the app sends is trusted: the order is read back from Cashfree and must be
      * PAID for this exact amount; then the first caller applies it (see markPaid()).

@@ -90,7 +90,7 @@ class BookingAdmin
             return 'A ride that has started cannot be sent back to drivers. Cancel it instead.';
         }
         $driverId = $b->driver_id;
-        self::move($b, Booking::STATUS_WAITING_FOR_DRIVER, ['driver_id' => null, 'cancel_reason' => null]);
+        self::move($b, Booking::STATUS_WAITING_FOR_DRIVER, ['driver_id' => null, 'cancel_reason' => null, 'notif_status' => 0]);
         if ($driverId) {
             DriverRequests::updateAll(
                 ['status' => DriverRequests::STATUS_DRIVER_CANCELLED, 'updated_on' => date('Y-m-d H:i:s')],
@@ -126,7 +126,7 @@ class BookingAdmin
         $previous = $b->driver_id;
         $tx = Yii::$app->db->beginTransaction();
         try {
-            self::move($b, Booking::STATUS_DRIVER_ACCEPTED, ['driver_id' => $driver->id, 'cancel_reason' => null]);
+            self::move($b, Booking::STATUS_DRIVER_ACCEPTED, ['driver_id' => $driver->id, 'cancel_reason' => null, 'notif_status' => 0]);
             // The chosen driver's offer is the accepted one; every other offer is closed.
             DriverRequests::updateAll(
                 ['status' => DriverRequests::STATUS_BOOKING_AUTO_CANCELLED, 'updated_on' => date('Y-m-d H:i:s')],

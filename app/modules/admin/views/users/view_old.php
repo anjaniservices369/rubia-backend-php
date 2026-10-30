@@ -47,7 +47,10 @@ $this->params['breadcrumbs'][] = ['label' => Yii::t('app', 'Users'), 'url' => ['
     </div>
     </div>
     <?php 
-    $emergencyContact = UserEmergencyContacts::find()->where(['user_id'=>$model->id])->one();
+    $emergencyContacts = UserEmergencyContacts::find()
+        ->where(['user_id' => $model->id])
+        ->orderBy(['id' => SORT_ASC])
+        ->all();
     ?>
 
     <div class="user-view">
@@ -60,20 +63,23 @@ $this->params['breadcrumbs'][] = ['label' => Yii::t('app', 'Users'), 'url' => ['
                 <!--  -->
             </div>
             <?php
-            if(!empty($emergencyContact))
+            if (!empty($emergencyContacts))
             { ?>
             <div class="row">
                 <?php 
                     $gridColumn = [
                         ['attribute' => 'id', 'visible' => false],
+                        'name',
                         'phone_number',
                         'relationship',
                         'status',
                     ];
-                    echo DetailView::widget([
-                        'model' => $emergencyContact,
-                        'attributes' => $gridColumn
-                    ]);
+                    foreach ($emergencyContacts as $emergencyContact) {
+                        echo DetailView::widget([
+                            'model' => $emergencyContact,
+                            'attributes' => $gridColumn
+                        ]);
+                    }
                 ?>
             </div>
             <?php }?>

@@ -11,6 +11,39 @@ Three things changed on the server that the apps can see:
 
 Nothing else in the request/response shapes changed.
 
+## 30 October 2026 - booking workflow fixes and device retest
+
+This update concerns the halting-driver service, not Taxi/Bike/Auto:
+
+- **Customer ride code:** keep it hidden on acceptance/on-way. Show it after arrival notification
+  (`status=4` and `notif_status=1`), or after successful OTP verification (`status=5`).
+  Acceptance/reassignment clears the old arrival flag.
+- **Driver OTP continuation:** keep the OTP widget mounted while awaiting the result; a successful
+  verification opens the pre-ride checklist directly. Wrong codes stay retryable on that screen.
+- **Driver Collect fare:** completed cards use `price_detail.estimatePrice` plus
+  `Pending_cancellation_charges`, matching collection. Do not collect `driver_earnings`, and do
+  not subtract a coupon twice. Uncompleted cards retain the driver earnings estimate.
+- **Joining fee:** refresh `driver/check` before continuing from registration and again before
+  checkout. A zero fee or satisfied payment flag bypasses the gateway; approval determines
+  whether to continue to profile review or location setup. Refresh errors must remain visible.
+- **Approval/location:** approval text describes profile approval, not payment. Granted
+  permissions bypass repeated consent; resumed settings are rechecked. GPS acquisition,
+  geocoding and location submission are bounded, with explicit retry on failure; do not claim
+  successful location setup before the backend accepts it.
+- **Dashboard only:** booking details show vehicle number and completed driver net earnings;
+  the legacy customer view displays every emergency contact. No new API field is required.
+
+Retested on Realme (customer) and Redmi (driver), isolated booking **1698**: readiness checks
+passed before booking; wrong/right OTP, camera uploads, start/end, test cash receipt and both
+reviews completed through the apps. Collect fare/bill/collection all showed INR 273; dashboard
+showed vehicle E2E1698 and INR 234 driver net. All ten photo slots were saved (eleven retained
+records, including an extra capture), served successfully and linked on the dashboard.
+
+This was stationary, with no actual cash or gateway payment. SMS/push delivery and fresh
+onboarding were not replayed in the repeat cycle. See
+[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md#latest-cross-project-verification---2026-10-30)
+for regression coverage, wallet reconciliation and cleanup.
+
 ---
 
 ## A. Changes that apply to BOTH apps
@@ -263,6 +296,22 @@ Messages are in `error` (some older actions use `details`); do not match on the 
 | any call, session of a blocked account | `check` answers NOK "session not found"; other calls NOK "User Not Found" | Treat as logged out and go to login (same as an expired session). |
 | (push) booking nobody accepted by pickup time | Booking becomes status **9** (Booking Auto Cancelled); notification title "Ride cancelled - please book again" with the ride details | Show status 9 as "Cancelled - no driver available" and offer **Book again**. |
 | (push) admin changed the booking | titles "Ride cancelled", "Finding you a driver", "Driver assigned" | Refresh the booking on open. |
+
+**Unanswered pickup expiry (30 Oct 2026):** the existing customer/driver list and detail calls now close overdue
+waiting bookings without relying on cron. Active/Available lists exclude them and customer Cancelled includes
+auto-cancelled status 9. `driver/accept-ride` also checks pickup time in its atomic update and returns NOK with
+"This booking is no longer available. Its pickup time has passed or another driver has accepted it." for a stale
+offer. Refresh the list after NOK; existing list polling picks up the removal. Already accepted/in-progress rides
+remain visible. The optional `booking_expiry_grace_minutes` setting still applies (default zero).
+
+**Customer ride OTP (30 Oct 2026):** arrival is reported by `driver/notify-arrived` as `status=4`,
+`notif_status=1`, before `driver/arrived-location` verifies the OTP and moves to status 5. The customer screen
+must show the arrival message and OTP for that flag combination as well as status 5, not for unarrived
+accepted/on-the-way bookings. The customer app now follows this existing arrival signal.
+
+**Admin dashboard display (30 Oct 2026):** booking pages now show the booking's vehicle number and, after
+completion, the driver's net earning. The legacy customer details page lists all emergency contacts. These
+are dashboard-only changes; mobile API request/response contracts are unchanged.
 
 ### Partner app (`/api/driver/*`)
 

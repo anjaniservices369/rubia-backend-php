@@ -1846,7 +1846,7 @@ public function actionApplyReferral()
     }
     // [doc:end] actionTransactionList
 
-    // [doc:start] actionWithdrawInfo - /api/driver/withdraw-info - What the withdraw screen shows: balance, minimum and the bank the money goes to.
+    // [doc:start] actionWithdrawInfo - /api/driver/withdraw-info - POST|GET /api/driver/withdraw-info.
     /**
      * POST|GET /api/driver/withdraw-info
      * OK: details = {balance, min_withdraw, bank: {account_holder_name, bank_name, account_number_masked, ifsc, upi} | null,
@@ -2243,6 +2243,9 @@ public function actionApplyReferral()
              $currentDateTime = date('Y-m-d H:i:s'); // Include time for more accurate comparison
 
             if (!empty($model)) {
+                \app\modules\dispatch\services\BookingExpiry::run(200, [
+                    'id' => (new \yii\db\Query())->select('booking_id')->from('driver_requests')->where(['driver_id' => $user_id]),
+                ]);
                 // BUILD THE LIST: bookings joined to this driver's offers (driver_requests), not yet paid, not cancelled by the customer.
                 $query = Booking::find()
                     ->innerJoinWith('driverRequests as dr')
@@ -2283,6 +2286,9 @@ public function actionApplyReferral()
                         // Offers this driver turned down, or accepted and then cancelled, are not offered to them again.
                         $query->andWhere(['booking.status' => $status])
                         ->andWhere(['NOT IN','dr.status',[Booking::STATUS_DRIVER_REJECTED, Booking::STATUS_DRIVER_CANCELLED]]);
+                        if ((int) $status === Booking::STATUS_WAITING_FOR_DRIVER) {
+                            $query->andWhere(\app\modules\dispatch\services\BookingExpiry::availablePickupCondition());
+                        }
                     }
                 }
 
@@ -2531,6 +2537,7 @@ public function actionApplyReferral()
                 // The caller must be a driver account.
                 $model = User::find()->where(['id' => $user_id])->andWhere(['user_role' => User::ROLE_DRIVER])->one();
                 if (!empty($model)) {
+                    \app\modules\dispatch\services\BookingExpiry::run(1, ['id' => $booking_id]);
                     // The booking must still be waiting. If another driver already took it, nothing is found here.
                     $booking = Booking::find()->where(['id' => $booking_id])->andWhere(['status' => Booking::STATUS_WAITING_FOR_DRIVER])
                         ->one();
@@ -2582,12 +2589,16 @@ if($availableBalance >= $driver_min_wallet_bal) {
     // Claim the booking with ONE conditional update. Two drivers tapping Accept at the same moment both pass the
     // "still waiting" check above, but only one of them changes a row here; the other gets 0 and is refused below.
     $claimed = Booking::updateAll(
-        ['status' => Booking::STATUS_DRIVER_ACCEPTED, 'driver_id' => $model->id, 'updated_on' => date('Y-m-d H:i:s')],
-        ['id' => $booking->id, 'status' => Booking::STATUS_WAITING_FOR_DRIVER]
+        ['status' => Booking::STATUS_DRIVER_ACCEPTED, 'driver_id' => $model->id, 'notif_status' => 0, 'updated_on' => date('Y-m-d H:i:s')],
+        ['and',
+            ['id' => $booking->id, 'status' => Booking::STATUS_WAITING_FOR_DRIVER],
+            \app\modules\dispatch\services\BookingExpiry::availablePickupCondition(),
+        ]
     );
     if (!$claimed) {
         $data['status'] = self::API_NOK;
-        $data['error'] = Yii::t('app', 'Looks like this booking is already accepted by another driver');
+        \app\modules\dispatch\services\BookingExpiry::run(1, ['id' => $booking->id]);
+        $data['error'] = Yii::t('app', 'This booking is no longer available. Its pickup time has passed or another driver has accepted it.');
         return $this->sendJsonResponse($data);
     }
     $booking->refresh();
@@ -2638,7 +2649,7 @@ if($availableBalance >= $driver_min_wallet_bal) {
 
                     } else {
                         $data['status'] = self::API_NOK;
-                        $data['error'] = Yii::t('app','Looks like this booking is already accepted by another driver');
+                        $data['error'] = Yii::t('app', 'This booking is no longer available. Its pickup time has passed or another driver has accepted it.');
                     }
                 } else {
                     $data['status'] = self::API_NOK;
@@ -3893,6 +3904,7 @@ $driverCancelDuplicate->booking_id = $booking->id; // Add this line
                 $booking_id = !empty($post['booking_id'])? $post['booking_id']: '';
 
                 if (!empty($booking_id)) {
+                    \app\modules\dispatch\services\BookingExpiry::run(1, ['id' => $booking_id]);
                     $booking = Booking::find()
                         ->where(['id' => $booking_id])
                         ->one();

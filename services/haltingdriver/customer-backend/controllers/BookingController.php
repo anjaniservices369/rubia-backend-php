@@ -139,12 +139,13 @@ class BookingController extends BKController
             $vehicle_id = Yii::$app->request->get('vehicle_id')??0; // Get the vehicle id from the request parameters
 
             if ($vehicle_id == 0 || $vehicle_id == 1 || $vehicle_id == '1' ) {
+                \app\modules\dispatch\services\BookingExpiry::run(200, ['user_id' => $user_id]);
                 $query = Booking::find()
                     ->where(['user_id' => $user_id]);
 
                 if (!empty($status)) {
                     if ($status == Booking::STATUS_CANCELLED) {
-                        $query->andWhere(['in', 'status', [Booking::STATUS_DRIVER_CANCELLED, Booking::STATUS_USER_CANCELLED]]);
+                        $query->andWhere(['in', 'status', [Booking::STATUS_DRIVER_CANCELLED, Booking::STATUS_USER_CANCELLED, Booking::STATUS_BOOKING_AUTO_CANCELLED, Booking::STATUS_CANCELLED]]);
                     } elseif ($status == Booking::STATUS_RIDE_COMPLETED) {
                         // Completed = finished, paid (the driver confirmed the payment) and rated by this customer.
                         $query->andWhere(['status' => $status])->andWhere(new \yii\db\Expression(self::closedForCustomerSql()));
@@ -166,6 +167,10 @@ class BookingController extends BKController
                     ]);
                 }
 
+                $query->andWhere(['or',
+                    ['<>', 'status', Booking::STATUS_WAITING_FOR_DRIVER],
+                    \app\modules\dispatch\services\BookingExpiry::availablePickupCondition(),
+                ]);
 
                 $query->orderBy(['created_on' => SORT_DESC]);
 

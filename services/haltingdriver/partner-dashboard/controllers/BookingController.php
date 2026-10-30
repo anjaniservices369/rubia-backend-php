@@ -117,6 +117,7 @@ class BookingController extends Controller
      */
     public function actionIndex()
     {
+        \app\modules\dispatch\services\BookingExpiry::run();
         $searchModel = new BookingSearch();
         if (\Yii::$app->user->identity->user_role == User::ROLE_ADMIN ||\Yii::$app->user->identity->user_role == User::ROLE_SUBADMIN) {
             
@@ -127,6 +128,7 @@ class BookingController extends Controller
         elseif (\Yii::$app->user->identity->user_role == User::ROLE_FRANCHISE){
             $dataProvider = $searchModel->managersearch(Yii::$app->request->queryParams,Booking::STATUS_WAITING_FOR_DRIVER);
         }
+        $dataProvider->query->andWhere(\app\modules\dispatch\services\BookingExpiry::availablePickupCondition());
         return $this->render('index', [
             'searchModel' => $searchModel,
             'dataProvider' => $dataProvider,
@@ -271,8 +273,9 @@ class BookingController extends Controller
     // [doc:start] actionAutoCanceledBookings - /admin/booking/auto-canceled-bookings - Auto Canceled Bookings
     public function actionAutoCanceledBookings()
 {
+    \app\modules\dispatch\services\BookingExpiry::run();
     $searchModel = new BookingSearch();
-    $dataProvider = $searchModel->search(Yii::$app->request->queryParams, Booking::STATUS_CANCELLED);
+    $dataProvider = $searchModel->search(Yii::$app->request->queryParams, Booking::STATUS_BOOKING_AUTO_CANCELLED);
 
     return $this->render('index', [
         'searchModel' => $searchModel,
@@ -295,6 +298,7 @@ class BookingController extends Controller
      */
     public function actionView($id)
     {
+        \app\modules\dispatch\services\BookingExpiry::run(1, ['id' => $id]);
         $model = $this->findModel($id);
 
         $providerDriverRequests = new \yii\data\ArrayDataProvider([

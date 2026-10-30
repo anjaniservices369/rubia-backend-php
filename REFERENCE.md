@@ -414,8 +414,9 @@ Payments screen of the Halting drivers dashboard: the Razorpay keys (pasted here
 
 | URL | Action | What it does |
 |---|---|---|
+| `/admin/payments/withdrawals` | `actionWithdrawals` | Withdrawal requests waiting to be paid, with the bank account each driver registered, and the latest settled ones. |
+| `/admin/payments/settle` | `actionSettle` | Mark a withdrawal as paid (with the bank reference) or reject it (the amount goes back to the driver's balance). |
 | `/admin/payments/index` | `actionIndex` | Razorpay keys, joining fee, onboarding switch and the latest partner payments; saves the form. |
-| `/admin/payments/decide` | `actionDecide` | Approve (credits once) or reject a payment a partner made by the company UPI QR, after checking the bank statement. |
 
 ### admin / pincode - `libs/taxicore/dashboard/controllers/PincodeController.php`
 
@@ -790,20 +791,20 @@ Partner (driver) app API: /api/driver/* - the DRIVER SERVICE (hire a driver for 
 | `/api/driver/add-pan-card` | `actionAddPanCard` | Add Pan Card. |
 | `/api/driver/police-verification` | `actionPoliceVerification` | Police Verification. |
 | `/api/driver/razorpay-create-order` | `actionRazorpayCreateOrder` | Starts a Razorpay payment. |
+| `/api/driver/cashfree-create-order` | `actionCashfreeCreateOrder` | Starts a Cashfree payment. |
 | `/api/driver/razorpay-verify` | `actionRazorpayVerify` | POST /api/driver/razorpay-verify razorpay_order_id, razorpay_payment_id, razorpay_signature. |
 | `/api/driver/razorpay-webhook` | `actionRazorpayWebhook` | Called by Razorpay, not by the app. Set this address as the webhook in the Razorpay dashboard with the events payment.captured,. |
 | `/api/driver/onboarding-status` | `actionOnboardingStatus` | POST/GET /api/driver/onboarding-status. |
 | `/api/driver/payment-options` | `actionPaymentOptions` | POST/GET /api/driver/payment-options (optional: purpose, amount - then the reply carries the amount the server will charge). |
 | `/api/driver/razorpay-create-qr` | `actionRazorpayCreateQr` | POST /api/driver/razorpay-create-qr purpose (joining_fee / wallet_topup / subscription), amount (wallet_topup only). |
 | `/api/driver/razorpay-qr-status` | `actionRazorpayQrStatus` | POST /api/driver/razorpay-qr-status qr_id. |
-| `/api/driver/manual-payment-submit` | `actionManualPaymentSubmit` | POST /api/driver/manual-payment-submit purpose, amount (wallet_topup only), utr. |
-| `/api/driver/manual-payment-status` | `actionManualPaymentStatus` | POST/GET /api/driver/manual-payment-status. |
 | `/api/driver/pay-joining-fee` | `actionPayJoiningFee` | The driver reports the joining fee paid through Razorpay. |
 | `/api/driver/driver-bank-details-add` | `actionDriverBankDetailsAdd` | Driver Bank Details Add. |
 | `/api/driver/driver-vehicle-types-add` | `actionDriverVehicleTypesAdd` | Driver Vehicle Types Add. |
 | `/api/driver/add-balance` | `actionAddBalance` | The driver reports a wallet top-up paid through Razorpay. |
 | `/api/driver/available-balance` | `actionAvailableBalance` | Available Balance. |
 | `/api/driver/transaction-list` | `actionTransactionList` | Transaction List. |
+| `/api/driver/withdraw-info` | `actionWithdrawInfo` | POST/GET /api/driver/withdraw-info. |
 | `/api/driver/withdraw` | `actionWithdraw` | Withdraw. |
 | `/api/driver/list-fcm-notifications` | `actionListFcmNotifications` | List Fcm Notifications. |
 | `/api/driver/driver-status` | `actionDriverStatus` | Go online / offline. Offline drivers receive no ride offers. |
@@ -866,20 +867,20 @@ Partner (driver) app API: /api/driver/* - the DRIVER SERVICE (hire a driver for 
 | `/api/driver/add-pan-card` | `actionAddPanCard` | Add Pan Card. |
 | `/api/driver/police-verification` | `actionPoliceVerification` | Police Verification. |
 | `/api/driver/razorpay-create-order` | `actionRazorpayCreateOrder` | Starts a Razorpay payment. |
+| `/api/driver/cashfree-create-order` | `actionCashfreeCreateOrder` | Starts a Cashfree payment. |
 | `/api/driver/razorpay-verify` | `actionRazorpayVerify` | POST /api/driver/razorpay-verify razorpay_order_id, razorpay_payment_id, razorpay_signature. |
 | `/api/driver/razorpay-webhook` | `actionRazorpayWebhook` | Called by Razorpay, not by the app. Set this address as the webhook in the Razorpay dashboard with the events payment.captured,. |
 | `/api/driver/onboarding-status` | `actionOnboardingStatus` | POST/GET /api/driver/onboarding-status. |
 | `/api/driver/payment-options` | `actionPaymentOptions` | POST/GET /api/driver/payment-options (optional: purpose, amount - then the reply carries the amount the server will charge). |
 | `/api/driver/razorpay-create-qr` | `actionRazorpayCreateQr` | POST /api/driver/razorpay-create-qr purpose (joining_fee / wallet_topup / subscription), amount (wallet_topup only). |
 | `/api/driver/razorpay-qr-status` | `actionRazorpayQrStatus` | POST /api/driver/razorpay-qr-status qr_id. |
-| `/api/driver/manual-payment-submit` | `actionManualPaymentSubmit` | POST /api/driver/manual-payment-submit purpose, amount (wallet_topup only), utr. |
-| `/api/driver/manual-payment-status` | `actionManualPaymentStatus` | POST/GET /api/driver/manual-payment-status. |
 | `/api/driver/pay-joining-fee` | `actionPayJoiningFee` | The driver reports the joining fee paid through Razorpay. |
 | `/api/driver/driver-bank-details-add` | `actionDriverBankDetailsAdd` | Driver Bank Details Add. |
 | `/api/driver/driver-vehicle-types-add` | `actionDriverVehicleTypesAdd` | Driver Vehicle Types Add. |
 | `/api/driver/add-balance` | `actionAddBalance` | The driver reports a wallet top-up paid through Razorpay. |
 | `/api/driver/available-balance` | `actionAvailableBalance` | Available Balance. |
 | `/api/driver/transaction-list` | `actionTransactionList` | Transaction List. |
+| `/api/driver/withdraw-info` | `actionWithdrawInfo` | POST/GET /api/driver/withdraw-info. |
 | `/api/driver/withdraw` | `actionWithdraw` | Withdraw. |
 | `/api/driver/list-fcm-notifications` | `actionListFcmNotifications` | List Fcm Notifications. |
 | `/api/driver/driver-status` | `actionDriverStatus` | Go online / offline. Offline drivers receive no ride offers. |

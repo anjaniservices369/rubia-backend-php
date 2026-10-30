@@ -6,6 +6,48 @@ App root: `app/`. Business-level description: `BUSINESS_GUIDE.md`. Deployment: `
 Other docs: `MODULES.md` (module map), `MEDIA_STORAGE.md` (uploads), `MOBILE_APP_CHANGES.md` (what the apps must do),
 `app/database/README.md` (migrations).
 
+## Latest cross-project verification - 2026-10-30
+
+Booking **1698** was created in the Realme customer app and accepted/completed in the Redmi
+driver app against the isolated local schema `rubia_e2e_20261030_0745`. Local-targeted debug
+APKs used port 8082; push was disabled. This run did not use production or require migrations.
+
+Verified before submitting the booking using fresh `driver/check` and `driver/available-balance`:
+`online_status=1`, `driver_subscription_status=1`, subscription 2026-10-30 through 2026-11-30,
+and wallet INR 61. The initial INR -39 balance correctly prevented going online; a user-approved,
+labelled INR 100 synthetic credit resolved it without a gateway transaction.
+
+The second cycle used **actual app camera capture/upload, ride start, and completion**, not the
+API-seeded photos or API-simulated start/end used for the earlier booking 1285. Required photo
+coverage is `(type=1|2, image_type=1|2|3|4|6)`: ten distinct slots. Eleven records exist for 1698,
+including an extra `(type=2, image_type=2)` capture. All eleven returned local HTTP 200 image
+responses and were referenced by authenticated booking-detail HTML. This proves capture,
+upload and display linkage, not that the images depict a valid vehicle inspection.
+
+Twelve scoped reconciliation assertions passed: completed/paid booking, vehicle E2E1698, one
+earning record, one successful debit created during this isolated ride, gross INR 273, driver
+net INR 234, admin/GST INR 39, debit INR 39, both five-star test reviews, all ten photo slots,
+and preservation of completed booking 1285. Wallet ended at INR 22. The wallet debit reason
+on this path is `Admin earnings debit 26 and gst is 13`, not a booking-id-bearing reason;
+do not assume every wallet description contains the booking id when reconciling records.
+
+Authenticated HTTP checks confirmed `/admin/booking/view?id=1698` shows the vehicle number,
+Driver Net Earning and both test reviews; `/admin/users/view?id=7157` shows both emergency
+contacts. These were HTML-response checks, not a browser-layout validation.
+
+Regression checks passed: 16 isolated booking-expiry checks, ten driver fare/onboarding rule
+tests, a permission-bypass/GPS-disabled retry widget test, and the existing driver tests.
+The customer arrival condition has two focused tests from the preceding cycle. Changed Dart
+files passed analysis after correcting the installed Geolocator API; the driver debug APK
+built and was installed. PHP view syntax and documentation checks passed.
+
+Limits: stationary ride (zero distance), simulated cash receipt, no live gateway/SMS/push,
+no fresh registration replay in this second cycle. Zero-fee/paid-fee routing has rule coverage;
+the fresh onboarding and approval-message screens were not replayed on device in this cycle.
+The prior registration used labelled synthetic identity/profile fixtures, not real identity
+verification. Cleanup took the driver offline, stopped both apps and the local server, removed
+ADB forwarding and temporary administrator credentials, and retained the isolated audit data.
+
 ---
 
 ## 1. Shape of the system
@@ -118,8 +160,27 @@ Guards you must keep (they were missing and were security holes):
 3. Stops after 40 s and returns a JSON summary.
 
 Driver `bookings` lists offers by joining `driver_requests`; `accept-ride` takes the booking atomically.
+The existing arrival signal is `status=4` plus `notif_status=1` from `driver/notify-arrived`; the customer
+shows the pickup OTP on that signal (or status 5). `driver/arrived-location` must still verify the OTP before
+moving to status 5 and allowing `start-ride`. Merely going for pickup (`status=4`, no arrival flag) keeps it hidden.
+Acceptance and dashboard reopen/assignment clear `notif_status` so a previous driver's arrival cannot reveal
+the OTP before the replacement driver reaches pickup.
+Booking lists and detail reads in both apps also run scoped `BookingExpiry::run()`; dashboard waiting,
+auto-cancelled and detail pages run it too. `BookingExpiry::availablePickupCondition()` excludes overdue waiting
+offers independently of the 200-row cleanup limit and is part of the conditional accept update, closing the
+pickup-time race even without cron. Customer cancellation history includes status 9 (auto-cancelled) and 11
+(admin-cancelled); the dashboard Auto Canceled Bookings page filters status 9. Accepted/in-progress rides are preserved.
+
+Regression check against a local test-database copy only: set `DB_DSN` to a localhost database whose name contains
+`test` or `e2e`, then from `app/` run `php tests/booking_expiry_test.php`. The test uses rolled-back fixture rows
+and an in-memory notification recorder, never a real SMS/push provider.
 
 ### Admin actions on a booking
+
+The Halting drivers booking detail (`partner-dashboard/views/booking/_invoice_view.php`) shows the vehicle
+number stored on the booking and, for completed rides, the `driver_earnings.driver_earning` net amount.
+The legacy `/admin/users/view` customer screen lists every emergency-contact row in id order; do not use
+`one()` for this one-to-many data. These are dashboard-only display changes and do not alter API payloads.
 
 `modules/dispatch/services/BookingAdmin.php` (used by `BookingController::actionManage/actionUpdateStatus`):
 `cancel`, `reopen`, `assignDriver`, `setProgress`. Each writes `booking_logs` and notifies. Completing a ride is not

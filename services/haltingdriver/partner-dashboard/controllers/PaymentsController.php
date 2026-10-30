@@ -52,7 +52,7 @@ class PaymentsController extends Controller
         $row->save(false);
     }
 
-    // [doc:start] actionWithdrawals - /admin/payments/withdrawals - Withdrawal requests waiting to be paid, with the bank account each driver registered.
+    // [doc:start] actionWithdrawals - /admin/payments/withdrawals - Withdrawal requests waiting to be paid, with the bank account each driver registered, and the latest settled ones.
     /**
      * Withdrawal requests waiting to be paid, with the bank account each driver registered, and the latest settled ones.
      */

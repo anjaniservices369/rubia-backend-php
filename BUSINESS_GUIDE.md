@@ -2,6 +2,31 @@
 
 For the owner. No technical knowledge needed. Everything here describes what the system does today.
 
+## Latest device verification - 30 October 2026
+
+The customer app on a Realme and the updated driver app on a Redmi completed booking **1698**
+against an isolated local database, not production. Before booking, the driver was online,
+the subscription was active through 30 November 2026, and the wallet was positive.
+
+- Customer confirmed an in-city, manual Sedan round trip for 11:00; the driver accepted before pickup.
+- A wrong ride code was rejected. The correct code opened the driver's verification checklist
+  immediately, without returning to the ride list. The customer saw the code only after arrival.
+- The actual camera screens captured the before/after selfie and four vehicle-photo slots per
+  stage. All ten required slots were stored; eleven image records were retained, including an
+  extra after-ride capture. Every uploaded image was retrievable and linked on the dashboard.
+- Ride start, vehicle number entry, completion, drop-location confirmation, test cash collection,
+  and both reviews were performed through the apps.
+- The completed card, bill, and collection screen agreed on **INR 273**. Dashboard vehicle
+  **E2E1698**, driver net earnings **INR 234**, and platform/GST deduction **INR 39** matched
+  the stored records. Both emergency contacts appeared in the legacy customer profile.
+- An approved, explicitly labelled **INR 100 synthetic test credit** changed the wallet from
+  INR -39 to INR 61 before booking; the new ride's single INR 39 debit left **INR 22**.
+  The test driver was taken offline afterward.
+
+This verifies a **stationary workflow**, not a real driven journey, vehicle-condition inspection,
+actual cash exchange, or payment-gateway transaction. Production, real SMS, and push delivery
+were not tested. See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for technical checks and limits.
+
 ---
 
 ## 1. What the system is
@@ -45,9 +70,14 @@ You sell two kinds of service:
   cannot accept another and receives no new offers.
 - A driver whose wallet is below the **minimum wallet balance** cannot accept rides.
 - The ride cannot start without the customer's OTP.
+- The customer sees the ride OTP only after the driver reports reaching pickup, not just after acceptance or
+  while travelling to pickup. Arrival notification and successful OTP verification are separate steps.
 - **If nobody accepts before the pickup time, the booking is cancelled automatically** and the customer receives a
   message with the ride details: "was cancelled because no driver was available. Please book again." The booking
   then appears under *Auto Canceled Bookings*.
+- Expired, unanswered rides disappear from the driver's Available Rides and the customer's Active Rides when
+  their lists refresh, even if the scheduled job is not running. They remain in cancellation history; a stale
+  Accept button cannot claim them. Already accepted or started rides are not cancelled just because pickup time passed.
 - Only the customer who owns a booking can cancel it, and only the driver who holds it can run its steps.
 
 ### What a cancellation costs
@@ -90,8 +120,8 @@ is one rule to change.
 | Menu | Use it to |
 |---|---|
 | **Dashboard** | Today's picture: drivers online, rides waiting for a driver, push-notification status, booking counts. |
-| **Bookings** (all, accepted, on the way, arrived, started, completed, cancelled, auto-cancelled) | Open any booking. At the top of a booking you can **cancel it, send it back to drivers, assign a specific driver, or set the ride state**. |
-| **Users** | Customers. See details, wallet, **Block / Unblock**. |
+| **Bookings** (all, accepted, on the way, arrived, started, completed, cancelled, auto-cancelled) | Open any booking. At the top of a booking you can **cancel it, send it back to drivers, assign a specific driver, or set the ride state**. The detail shows the vehicle number and, for completed rides, the driver's net earning. |
+| **Users** | Customers. See details, all emergency contacts, wallet, **Block / Unblock**. |
 | **Driver / Driver Module** | Partners: documents, verification, wallet, subscriptions, **Block / Unblock**. |
 | **Taxi / Auto / Bike Module** | The same for the taxi services: ride requests, commissions, payouts. |
 | **Franchise** | City franchise accounts. |
