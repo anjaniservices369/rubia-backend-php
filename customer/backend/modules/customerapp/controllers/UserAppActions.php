@@ -305,7 +305,7 @@ if (($send_otp['Status'] ?? '') == 'Success') {
 
     // [doc:end] actionVerifyOtp
 
-    // [doc:start] actionUpdateProfile - /api/user/update-profile - Update Profile
+    // [doc:start] actionUpdateProfile - /api/user/update-profile - Update required name/email and optional profile fields without clearing omitted values.
     public function actionUpdateProfile()
     {
         $data = [];
@@ -322,22 +322,52 @@ if (($send_otp['Status'] ?? '') == 'Success') {
                         ->where(['id' => $user_id])
                         ->andWhere(['user_role' => User::ROLE_USER])
                         ->one();
-                    $first_name = !empty($post['first_name'])
-                        ? $post['first_name']
-                        : '';
-                    $last_name = !empty($post['last_name'])
-                        ? $post['last_name']
-                        : '';
-                    $email = !empty($post['email']) ? $post['email'] : '';
-                    $date_of_birth = !empty($post['date_of_birth'])
-                        ? $post['date_of_birth']
-                        : '';
-                    $gender = !empty($post['gender']) ? $post['gender'] : '';
                     if (!empty($model)) {
+                        foreach (['first_name', 'last_name', 'email', 'date_of_birth', 'gender'] as $field) {
+                            if (array_key_exists($field, $post) && !is_scalar($post[$field])) {
+                                $data['status'] = self::API_NOK;
+                                $data['error'] = 'Profile details are invalid.';
+                                return $this->sendJsonResponse($data);
+                            }
+                        }
+                        $first_name = array_key_exists('first_name', $post)
+                            ? trim((string) $post['first_name'])
+                            : trim((string) $model->first_name);
+                        $email = array_key_exists('email', $post)
+                            ? trim((string) $post['email'])
+                            : trim((string) $model->email);
+                        $gender = array_key_exists('gender', $post)
+                            ? trim((string) $post['gender'])
+                            : trim((string) $model->gender);
+                        if ($first_name === '') {
+                            $data['status'] = self::API_NOK;
+                            $data['error'] = 'A full name is required.';
+                            return $this->sendJsonResponse($data);
+                        }
+                        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                            $data['status'] = self::API_NOK;
+                            $data['error'] = 'A valid e-mail address is required.';
+                            return $this->sendJsonResponse($data);
+                        }
+                        if (!in_array($gender, ['', 'Male', 'Female', 'Other', 'Others'], true)) {
+                            $data['status'] = self::API_NOK;
+                            $data['error'] = 'Choose Male, Female or Other.';
+                            return $this->sendJsonResponse($data);
+                        }
+                        if (User::find()->where(['email' => $email, 'user_role' => User::ROLE_USER])
+                            ->andWhere(['<>', 'id', $model->id])->exists()) {
+                            $data['status'] = self::API_NOK;
+                            $data['error'] = 'Another customer already uses this e-mail address.';
+                            return $this->sendJsonResponse($data);
+                        }
                         $model->first_name = $first_name;
-                        $model->last_name = $last_name;
+                        if (array_key_exists('last_name', $post)) {
+                            $model->last_name = trim((string) $post['last_name']);
+                        }
                         $model->email = $email;
-                        $model->date_of_birth = $date_of_birth;
+                        if (array_key_exists('date_of_birth', $post)) {
+                            $model->date_of_birth = trim((string) $post['date_of_birth']);
+                        }
                         $model->gender = $gender;
                         if ($model->save(false)) {
                             $data['status'] = self::API_OK;
@@ -478,7 +508,7 @@ if (($send_otp['Status'] ?? '') == 'Success') {
 
     // [doc:end] actionUpdateLatLng
 
-    // [doc:start] actionAddUserEmergencyContacts - /api/user/add-user-emergency-contacts - Add User Emergency Contacts
+    // [doc:start] actionAddUserEmergencyContacts - /api/user/add-user-emergency-contacts - Save two distinct valid numbers atomically; names and relationships are optional.
     public function actionAddUserEmergencyContacts()
     {
         $data = [];
@@ -491,60 +521,78 @@ if (($send_otp['Status'] ?? '') == 'Success') {
             $user_id = $auth->getAuthSession($headers);
             if (!empty($user_id)) {
                 $user = User::find()
-                    ->where(['id' => $user_id])
+                    ->where(['id' => $user_id, 'user_role' => User::ROLE_USER])
                     ->one();
                 if (!empty($user)) {
-                    $person_name_one = !empty($post['person_name_one'])
-                        ? $post['person_name_one']
-                        : '';
-                    $person_phone_number_one = !empty(
-                        $post['person_phone_number_one']
-                    )
-                        ? $post['person_phone_number_one']
-                        : '';
-                    $person_relationship_one = !empty(
-                        $post['person_relationship_one']
-                    )
-                        ? $post['person_relationship_one']
-                        : '';
-
-                    $person_name_two = !empty($post['person_name_two'])
-                        ? $post['person_name_two']
-                        : '';
-                    $person_phone_number_two = !empty(
-                        $post['person_phone_number_two']
-                    )
-                        ? $post['person_phone_number_two']
-                        : '';
-                    $person_relationship_two = !empty(
-                        $post['person_relationship_two']
-                    )
-                        ? $post['person_relationship_two']
-                        : '';
-                    // Saving again replaces this customer's own two contacts (a retry, or a customer who had saved them before,
-                    // must not be blocked). The old check passed the whole User object into the query, which Yii turned into a
-                    // list of all the user's field values, so it counted other customers' contacts and answered "Exist".
-                    UserEmergencyContacts::deleteAll(['user_id' => $user_id]);
-
                     $people = [
-                        [$person_name_one, $person_phone_number_one, $person_relationship_one],
-                        [$person_name_two, $person_phone_number_two, $person_relationship_two],
+                        [
+                            $post['person_name_one'] ?? '',
+                            $post['person_phone_number_one'] ?? '',
+                            $post['person_relationship_one'] ?? '',
+                        ],
+                        [
+                            $post['person_name_two'] ?? '',
+                            $post['person_phone_number_two'] ?? '',
+                            $post['person_relationship_two'] ?? '',
+                        ],
                     ];
+                    $normalizedPeople = [];
+                    $phones = [];
                     foreach ($people as $person) {
-                        if ($person[1] === '') {
-                            continue; // no number, nothing to save
+                        foreach ($person as $value) {
+                            if (!is_scalar($value)) {
+                                $data['status'] = self::API_NOK;
+                                $data['details'] = 'Emergency contact details are invalid.';
+                                return $this->sendJsonResponse($data);
+                            }
                         }
-                        $contact = new UserEmergencyContacts();
-                        $contact->name = $person[0];
-                        $contact->user_id = $user_id;
-                        $contact->phone_number = $person[1];
-                        $contact->relationship = $person[2];
-                        $contact->status = UserEmergencyContacts::STATUS_ACTIVE;
-                        $contact->save(false);
+                        $phone = preg_replace('/\D+/', '', (string) $person[1]);
+                        if (!preg_match('/^[6-9]\d{9}$/', $phone)) {
+                            $data['status'] = self::API_NOK;
+                            $data['details'] = 'Enter two valid 10 digit emergency contact numbers.';
+                            return $this->sendJsonResponse($data);
+                        }
+                        if (in_array($phone, $phones, true)) {
+                            $data['status'] = self::API_NOK;
+                            $data['details'] = 'Emergency contact numbers must be different.';
+                            return $this->sendJsonResponse($data);
+                        }
+                        $phones[] = $phone;
+                        $normalizedPeople[] = [
+                            mb_substr(trim((string) $person[0]), 0, 100),
+                            $phone,
+                            mb_substr(trim((string) $person[2]), 0, 50),
+                        ];
+                    }
+
+                    // Validate both contacts before replacing existing data, then save them atomically.
+                    $transaction = Yii::$app->db->beginTransaction();
+                    try {
+                        UserEmergencyContacts::deleteAll(['user_id' => $user_id]);
+                        foreach ($normalizedPeople as $person) {
+                            $contact = new UserEmergencyContacts();
+                            $contact->name = $person[0];
+                            $contact->user_id = $user_id;
+                            $contact->phone_number = $person[1];
+                            $contact->relationship = $person[2];
+                            $contact->status = UserEmergencyContacts::STATUS_ACTIVE;
+                            if (!$contact->save(false)) {
+                                throw new \RuntimeException('Emergency contact insert failed.');
+                            }
+                        }
+                        $transaction->commit();
+                    } catch (\Throwable $e) {
+                        if ($transaction->isActive) {
+                            $transaction->rollBack();
+                        }
+                        Yii::error('customer emergency contacts: ' . $e->getMessage(), 'profile');
+                        $data['status'] = self::API_NOK;
+                        $data['details'] = 'Could not save emergency contacts. Existing contacts were not changed.';
+                        return $this->sendJsonResponse($data);
                     }
 
                     $data['status'] = self::API_OK;
-                    $data['details'] = 'Emergency contact updated successfully';
+                    $data['details'] = 'Emergency contacts updated successfully';
                 } else {
                     $data['status'] = self::API_NOK;
                     $data['error'] = 'Wrong User';

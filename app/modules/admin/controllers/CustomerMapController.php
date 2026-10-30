@@ -42,7 +42,7 @@ class CustomerMapController extends Controller
     public function actionIndex()
     {
         $rows = User::find()
-            ->select(['id', 'first_name', 'last_name', 'lat', 'lng', 'city_name'])
+            ->select(['id', 'first_name', 'lat', 'lng', 'city_name'])
             ->where(['user_role' => User::ROLE_USER])
             ->andWhere(['<>', 'lat', ''])
             ->andWhere(['<>', 'lng', ''])
@@ -62,7 +62,7 @@ class CustomerMapController extends Controller
             if ($lat >= 60 && $lat <= 100 && $lng >= 5 && $lng <= 40) {
                 [$lat, $lng] = [$lng, $lat];
             }
-            $name = trim($row['first_name'] . ' ' . $row['last_name']) ?: ('Customer #' . $row['id']);
+            $name = trim($row['first_name']) ?: ('Customer #' . $row['id']);
             $points[] = [
                 'id' => (int) $row['id'],
                 'lat' => $lat,

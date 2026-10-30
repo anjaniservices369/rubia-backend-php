@@ -642,7 +642,7 @@ UsersController implements the CRUD actions for User model.
 | `/admin/users/create-franchise` | `actionCreateFranchise` | Create Franchise. |
 | `/admin/users/update` | `actionUpdate` | Updates an existing User model. |
 | `/admin/users/view` | `actionView` | View. |
-| `/admin/users/user-profile` | `actionUserProfile` | A customer's whole profile as entered in the customer app: personal details (first and last name are mandatory), emergency. |
+| `/admin/users/user-profile` | `actionUserProfile` | A customer's whole profile as entered in the customer app: personal details (one required full name; last name is optional), emergency. |
 | `/admin/users/driver-profile` | `actionDriverProfile` | A driver's whole profile as entered in the partner app: personal details, driving licence, Aadhaar, PAN, bank details, emergency. |
 | `/admin/users/driver-view` | `actionDriverView` | Driver View. |
 | `/admin/users/delete` | `actionDelete` | Removes an account by marking it deleted. The row is kept, so the rides, wallet entries, ratings and. |

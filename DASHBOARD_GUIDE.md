@@ -138,7 +138,11 @@ Do not claim stronger traceability than the stored fields provide.
 ## 6. Profiles, photos and eligibility
 
 Customers-profile is under `/admin/users`; a legacy detail route is
-`/admin/users/view?id=<id>`. It now displays all emergency contacts, not just the first.
+`/admin/users/view?id=<id>`. It displays all emergency contacts, not just the first, and
+marks registration incomplete until the full name, valid e-mail and two distinct valid
+emergency phone numbers are present. Names and relationships on emergency contacts are
+optional because the customer app currently sends phone numbers only; staff may fill those
+details in later. A phone number may be shared by different customers.
 Drivers-profile is `/admin/users/drivers`; inspect the full onboarding profile, documents,
 bank/UPI information, approval state, subscription and wallet separately.
 

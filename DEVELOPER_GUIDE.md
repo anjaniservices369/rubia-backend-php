@@ -422,6 +422,14 @@ After adding, moving or renaming a class run `php yii service/pack --all`.
 `UserAppActions`: a booking flow belongs to the service (`services/<service>/customer-backend`); `app/glue` is the only place
 where both are combined, for the shared process.
 
+The shared customer profile endpoints remain in `customer/backend/modules/customerapp/controllers/UserAppActions.php`.
+`POST /api/user/update-profile` requires a valid full name and e-mail, accepts `Other` as a gender value, and preserves optional
+fields omitted from a partial request. `POST /api/user/add-user-emergency-contacts` validates two distinct Indian mobile numbers
+for one customer and replaces the pair transactionally; names and relationships are optional because the app currently sends
+phone numbers only. There is deliberately no cross-customer phone-number uniqueness check. `User::asJson()` reports
+`user_emergency_contacts=true` only when two distinct active valid numbers exist. The app's immediate post-OTP navigation must
+also check that response flag; the backend cannot force that Flutter route to display the contacts step.
+
 ## 12. Dispatch, trip rules and distance tracking (27 Oct 2026)
 
 Plain-language version: BUSINESS_GUIDE.md section 24. This is where the code is.

@@ -14,6 +14,20 @@ Nothing else in the request/response shapes changed.
 Dashboard sign-in/role/layout fixes are dashboard-only and do not change mobile authentication
 or API response shapes. See [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md) for operator workflows.
 
+## 30 October 2026 - customer registration profile contract
+
+- Customer profile updates require a full name and valid e-mail. Omitted optional fields are preserved; `Other` is accepted for
+  gender as well as the legacy `Others` value.
+- Registration emergency-contact submission must contain two valid, different 10-digit Indian mobile numbers. Names and
+  relationships are optional because the current app form submits phone numbers only. A number may be reused by a different
+  customer. The server replaces the pair atomically and reports contact completion only when two distinct active valid numbers
+  are stored.
+- Customer app navigation is unchanged; dashboard profile requirements and labels follow the fields submitted by the existing
+  app registration flow. The only app change is cosmetic: the first screen after the splash is headed **Register / Login**
+  (new and returning customers use it; its button still says Login). Verified on a Realme against an isolated database: OTP,
+  full name + email + optional gender `Other`, two emergency numbers, then Home; the saved customer and two active distinct
+  contacts matched what was entered.
+
 ## 30 October 2026 - booking workflow fixes and device retest
 
 This update concerns the halting-driver service, not Taxi/Bike/Auto:

@@ -126,7 +126,7 @@ is one rule to change.
 |---|---|
 | **Dashboard** | Today's picture: drivers online, rides waiting for a driver, push-notification status, booking counts. |
 | **Bookings** (all, accepted, on the way, arrived, started, completed, cancelled, auto-cancelled) | Open any booking. At the top of a booking you can **cancel it, send it back to drivers, assign a specific driver, or set the ride state**. The detail shows the vehicle number and, for completed rides, the driver's net earning. |
-| **Users** | Customers. See details, all emergency contacts, wallet, **Block / Unblock**. |
+| **Users** | Customers. See details, all emergency contacts, wallet, **Block / Unblock**. Customers-profile marks registration incomplete until full name, e-mail and two different valid emergency numbers are present. Contact names and relationships may be added later; the same emergency number may be used by different customers. |
 | **Driver / Driver Module** | Partners: documents, verification, wallet, subscriptions, **Block / Unblock**. |
 | **Taxi / Auto / Bike Module** | The same for the taxi services: ride requests, commissions, payouts. |
 | **Franchise** | City franchise accounts. |

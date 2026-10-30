@@ -401,8 +401,9 @@ lists what is `missing`.
 
 ## 26. Customers-profile: the customer profile
 
-Menu **Customers > Customers-profile** lists the customers; opening one shows `/admin/users/user-profile?id=<customer id>`: personal details (first and last name are
-mandatory, e-mail, date of birth, gender, alternative contact, city, address and photo are optional), emergency contacts, saved places (type, written
+Menu **Customers > Customers-profile** lists the customers; opening one shows `/admin/users/user-profile?id=<customer id>`: personal details (the full name
+entered during customer-app registration and e-mail are required; date of birth, gender, alternative contact, city, address and photo are optional), emergency
+contacts (two different valid 10-digit numbers are required for one customer; a number may also be used by other customers. Names and relationships are optional because the app currently collects numbers only), saved places (type, written
 address and pincode can be corrected or a place removed; places are added in the app because they need a point on the map) and the ride summary. Each section
 has its own Save button and writes the rows the customer app writes. The photo is stored like the partner photos under `profile/<customer id>/profile_image/`.
 

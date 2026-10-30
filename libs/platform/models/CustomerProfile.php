@@ -11,7 +11,8 @@ use yii\db\Query;
  * Everything a customer enters in the customer app, in one place, readable and editable by the company: personal details (with the photo),
  * emergency contacts and saved places (home, office, other). The dashboard page "Users-profile" (users/user-profile) is built on this.
  *
- * Mandatory: first name and last name (no blanks). Optional: e-mail, date of birth, gender, address, alternative contact, city, photo.
+ * The customer app registration requires a full name, e-mail and two emergency contact numbers. Contact names and relationships are not collected by the app.
+ * Date of birth, gender, address, alternative contact, city and photo are optional.
  * Each section is saved on its own (section = personal, contacts, places) into the rows the app writes, so both always agree.
  */
 class CustomerProfile
@@ -46,19 +47,31 @@ class CustomerProfile
     }
     // [doc:end] load
 
-    // [doc:start] missing - What a customer still has to fill in (first and last name).
+    // [doc:start] missing - Required customer registration details not yet provided.
     /**
-     * @return string[] names of what is missing
+     * @return string[] required details that are missing
      */
     public static function missing($userId)
     {
         $u = User::find()->where(['id' => (int) $userId])->one();
         $out = [];
         if (!$u || trim((string) $u->first_name) === '') {
-            $out[] = 'first name';
+            $out[] = 'full name';
         }
-        if (!$u || trim((string) $u->last_name) === '') {
-            $out[] = 'last name';
+        if (!$u || !filter_var(trim((string) $u->email), FILTER_VALIDATE_EMAIL)) {
+            $out[] = 'e-mail';
+        }
+        $phones = (new Query())
+            ->select('phone_number')
+            ->from('user_emergency_contacts')
+            ->where(['user_id' => (int) $userId, 'status' => 1])
+            ->column();
+        $validPhones = array_filter(array_map(static function ($phone) {
+            $phone = preg_replace('/\D+/', '', (string) $phone);
+            return preg_match('/^[6-9]\d{9}$/', $phone) ? $phone : null;
+        }, $phones));
+        if (count($validPhones) < 2) {
+            $out[] = 'two emergency contacts';
         }
 
         return $out;
@@ -130,7 +143,6 @@ class CustomerProfile
     private static function savePersonal(User $u, array $p, $adminId)
     {
         $first = self::text($p, 'first_name', 100);
-        $last = self::text($p, 'last_name', 100);
         $email = self::text($p, 'email', 255);
         $dob = self::date($p['date_of_birth'] ?? '');
         $gender = self::text($p, 'gender', 20);
@@ -138,11 +150,8 @@ class CustomerProfile
         if ($first === '') {
             return [false, 'The first name is required.'];
         }
-        if ($last === '') {
-            return [false, 'The last name is required.'];
-        }
-        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return [false, 'The e-mail address is not valid.'];
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return [false, 'A valid e-mail address is required.'];
         }
         if ($email !== '' && User::find()->where(['email' => $email, 'user_role' => User::ROLE_USER])->andWhere(['<>', 'id', $u->id])->exists()) {
             return [false, 'Another customer already uses this e-mail address.'];
@@ -153,14 +162,13 @@ class CustomerProfile
         if ($dob !== null && $dob > date('Y-m-d')) {
             return [false, 'The date of birth cannot be in the future.'];
         }
-        if ($gender !== '' && !in_array($gender, DriverProfile::GENDERS, true)) {
-            return [false, 'Choose Male, Female or Others.'];
+        if ($gender !== '' && !in_array($gender, ['Male', 'Female', 'Other', 'Others'], true)) {
+            return [false, 'Choose Male, Female or Other.'];
         }
         if ($alt !== '' && strlen($alt) !== 10) {
             return [false, 'The alternative contact must be 10 digits.'];
         }
         $u->first_name = $first;
-        $u->last_name = $last;
         $u->email = $email;
         $u->date_of_birth = $dob;
         $u->gender = $gender;
@@ -192,6 +200,7 @@ class CustomerProfile
     {
         $db = Yii::$app->db;
         $own = array_map('intval', (new Query())->select('id')->from('user_emergency_contacts')->where(['user_id' => $u->id])->column());
+        $phones = [];
         foreach (is_array($p['contact'] ?? null) ? $p['contact'] : [] as $id => $c) {
             $isNew = !ctype_digit((string) $id);
             if (!$isNew && !in_array((int) $id, $own, true)) {
@@ -208,9 +217,13 @@ class CustomerProfile
             if ($isNew && $name === '' && $phone === '') {
                 continue; // an empty new row
             }
-            if ($name === '' || strlen($phone) !== 10) {
-                return [false, 'Every emergency contact needs a name and a 10 digit phone number.'];
+            if (!preg_match('/^[6-9]\d{9}$/', $phone)) {
+                return [false, 'Every emergency contact needs a valid 10 digit phone number.'];
             }
+            if (in_array($phone, $phones, true)) {
+                return [false, 'Emergency contact numbers for one customer must be different.'];
+            }
+            $phones[] = $phone;
             $v = ['name' => $name, 'phone_number' => $phone, 'relationship' => self::text($c, 'relationship', 50)];
             if ($isNew) {
                 $db->createCommand()->insert('user_emergency_contacts', self::stamp($v + ['user_id' => $u->id], $adminId, true))->execute();

@@ -1099,19 +1099,18 @@ class User extends ActiveRecord implements IdentityInterface
         $data['created_at'] = date('d-m-Y', $this->created_at);
         
         if ($this->user_role == self::ROLE_USER) {
-            if (!empty($this->first_name)) {
-                $data['personal_details'] = true;
-            } else {
-                $data['personal_details'] = false;
-            }
-            $user_emergency_contacts = UserEmergencyContacts::find()
+            $data['personal_details'] = trim((string) $this->first_name) !== ''
+                && filter_var(trim((string) $this->email), FILTER_VALIDATE_EMAIL) !== false;
+            $user_emergency_contact_phones = UserEmergencyContacts::find()
+                ->select('phone_number')
                 ->where(['user_id' => $this->id])
-                ->one();
-            if (!empty($user_emergency_contacts)) {
-                $data['user_emergency_contacts'] = true;
-            } else {
-                $data['user_emergency_contacts'] = false;
-            }
+                ->andWhere(['status' => UserEmergencyContacts::STATUS_ACTIVE])
+                ->column();
+            $user_emergency_contact_phones = array_filter(array_map(static function ($phone) {
+                $phone = preg_replace('/\D+/', '', (string) $phone);
+                return preg_match('/^[6-9]\d{9}$/', $phone) ? $phone : null;
+            }, $user_emergency_contact_phones));
+            $data['user_emergency_contacts'] = count(array_unique($user_emergency_contact_phones)) >= 2;
         }
     // var_dump(User::isDriver());exit;
         if ($this->user_role == self::ROLE_DRIVER) {
@@ -1363,5 +1362,3 @@ class User extends ActiveRecord implements IdentityInterface
   
     
 }
-
-

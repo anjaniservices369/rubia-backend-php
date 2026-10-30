@@ -2,7 +2,6 @@
 
 use app\models\User;
 use app\modules\admin\models\CustomerProfile;
-use app\modules\admin\models\DriverProfile;
 use yii\helpers\Html;
 
 /* @var $this yii\web\View */
@@ -12,7 +11,7 @@ use yii\helpers\Html;
 /* @var $stats array */
 /* @var $cities array */
 
-$name = trim($user->first_name . ' ' . $user->last_name);
+$name = trim((string) $user->first_name);
 $this->title = 'Customers-profile: ' . ($name !== '' ? $name : $user->contact_no);
 $this->params['breadcrumbs'][] = ['label' => 'Customers-profile', 'url' => ['index']];
 $this->params['breadcrumbs'][] = $name !== '' ? $name : $user->contact_no;
@@ -54,7 +53,7 @@ $in = function ($name, $value, $extra = []) {
     <div class="rb-split">
     <div class="rb-main">
     <div class="alert alert-<?= $missing ? 'warning' : 'success' ?>">
-        <?= $missing ? 'Required: ' . Html::encode(implode(', ', $missing)) . '. The first and last name are mandatory; everything else is optional.' : 'All mandatory profile details are filled in (first and last name).' ?>
+        <?= $missing ? 'Registration incomplete: ' . Html::encode(implode(', ', $missing)) . '. The app requires a full name, e-mail and two emergency contact numbers.' : 'Required registration details are present: full name, e-mail and two emergency contact numbers.' ?>
     </div>
 
     <div class="card mb-3" id="personal"><div class="card-header"><strong>Personal details</strong></div><div class="card-body">
@@ -62,13 +61,13 @@ $in = function ($name, $value, $extra = []) {
         $photo = $user->profile_image
             ? '<a href="' . Html::encode($user->profile_image) . '" target="_blank" rel="noopener"><img src="' . Html::encode($user->profile_image) . '" alt="Photo" class="img-thumbnail mb-1" style="max-height:140px" loading="lazy"></a>'
             : '<div class="text-muted small mb-1">No photo</div>';
+        $gender = $user->gender === 'Others' ? 'Other' : $user->gender;
         $inner = '<div class="row">'
-            . $field('First name *', $in('first_name', $user->first_name, ['required' => true, 'maxlength' => 100]))
-            . $field('Last name *', $in('last_name', $user->last_name, ['required' => true, 'maxlength' => 100]))
+            . $field('Full name (as entered in the app) *', $in('first_name', $user->first_name, ['required' => true, 'maxlength' => 100]))
             . $field('Mobile number (login, cannot be changed here)', $in('contact_no_view', $user->contact_no, ['disabled' => true]))
-            . $field('E-mail', Html::input('email', 'email', $user->email, ['class' => 'form-control', 'maxlength' => 255]))
+            . $field('E-mail *', Html::input('email', 'email', $user->email, ['class' => 'form-control', 'maxlength' => 255, 'required' => true]))
             . $field('Date of birth', Html::input('date', 'date_of_birth', $user->date_of_birth, ['class' => 'form-control']))
-            . $field('Gender', Html::dropDownList('gender', $user->gender, array_combine(DriverProfile::GENDERS, DriverProfile::GENDERS), ['class' => 'form-select', 'prompt' => '']))
+            . $field('Gender', Html::dropDownList('gender', $gender, array_combine(['Male', 'Female', 'Other'], ['Male', 'Female', 'Other']), ['class' => 'form-select', 'prompt' => '']))
             . $field('Alternative contact', $in('alternative_contact', $user->alternative_contact, ['maxlength' => 10, 'inputmode' => 'numeric']))
             . $field('City (found from the address)', $in('city_view', trim($user->city_name . ($user->lat ? ' (' . round((float) $user->lat, 5) . ', ' . round((float) $user->lng, 5) . ')' : '')) ?: 'not found yet - save the address', ['disabled' => true]))
             . $field('Address (the city is found from it)', $in('address', $user->address, ['maxlength' => 255]), 'col-md-8')
@@ -84,13 +83,14 @@ $in = function ($name, $value, $extra = []) {
         $inner = '';
         $rows = $contacts;
         $rows[] = ['id' => 'new1', 'name' => '', 'phone_number' => '', 'relationship' => ''];
+        $inner .= '<p class="text-muted small">The customer app collects two phone numbers only. Contact names and relationships may be blank; add them here when available.</p>';
         foreach ($rows as $c) {
             $id = $c['id'];
             $isNew = !ctype_digit((string) $id);
             $inner .= '<div class="row border rounded p-2 mb-2 mx-0">'
-                . $field($isNew ? 'Add a contact: name' : 'Name', $in("contact[$id][name]", $c['name'], ['maxlength' => 100]), 'col-md-4')
+                . $field($isNew ? 'Add a contact: name (optional)' : 'Name (optional)', $in("contact[$id][name]", $c['name'], ['maxlength' => 100]), 'col-md-4')
                 . $field('Phone (10 digits)', $in("contact[$id][phone_number]", $c['phone_number'], ['maxlength' => 12, 'inputmode' => 'numeric']), 'col-md-3')
-                . $field('Relationship', $in("contact[$id][relationship]", $c['relationship'], ['maxlength' => 50]), 'col-md-3')
+                . $field('Relationship (optional)', $in("contact[$id][relationship]", $c['relationship'], ['maxlength' => 50]), 'col-md-3')
                 . ($isNew ? '' : '<div class="col-md-2 mb-3 d-flex align-items-end"><label class="form-check-label"><input type="checkbox" class="form-check-input" name="contact[' . $id . '][delete]" value="1"> remove</label></div>')
                 . '</div>';
         }

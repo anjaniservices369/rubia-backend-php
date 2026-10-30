@@ -699,9 +699,9 @@ public function actionDrivers($status = User::STATUS_ACTIVE, $profile_verified =
 	// [doc:end] actionView
 
 
-	// [doc:start] actionUserProfile - /admin/users/user-profile - A customer's whole profile as entered in the customer app: personal details (first and last name are mandatory), emergency.
+	// [doc:start] actionUserProfile - /admin/users/user-profile - A customer's whole profile as entered in the customer app: personal details (one required full name; last name is optional), emergency.
 	/**
-	 * A customer's whole profile as entered in the customer app: personal details (first and last name are mandatory), emergency
+	 * A customer's whole profile as entered in the customer app: personal details (one required full name; last name is optional), emergency
 	 * contacts and saved places, with the ride summary. Posting a form saves that section (field "section"), see CustomerProfile::save.
 	 */
 	public function actionUserProfile($id)
