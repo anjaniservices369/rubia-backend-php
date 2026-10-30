@@ -3,9 +3,8 @@
 /**
  * The services and what each one's own entry point serves.
  *
- * Today every service still runs from this one codebase and database; each gets its own entry point
- * (web/<service>.php) that exposes only that service's API addresses, so it can be deployed, routed and later
- * moved to its own database on its own. The public addresses are the ones in config/api-routes.php, unchanged.
+ * Every service has its own entry point (web/<service>.php) and can use a separate database through its
+ * DB_DSN_<SERVICE> setting. The public addresses are the ones in config/api-routes.php, unchanged.
  *
  *   module    service number (ServiceModules)
  *   api       API address prefixes this entry point answers (everything else is 404)

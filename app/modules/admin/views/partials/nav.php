@@ -177,6 +177,11 @@ use app\modules\admin\widgets\Menu;
                        'options' => ['class' => 'bold'],
                    ],
                    [
+                       'label' => 'Account deletions',
+                       'url' => ['/admin/account-deletion/index'],
+                       'options' => ['class' => 'bold'],
+                   ],
+                   [
                        'label' => 'Cities',
                        // Same shared city list Halting drivers manages (CityController is not service-specific);
                        // added here too so a Customer app franchise/admin can see and manage cities without

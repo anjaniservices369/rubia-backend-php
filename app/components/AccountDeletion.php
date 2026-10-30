@@ -2,6 +2,7 @@
 
 namespace app\components;
 
+use app\models\User;
 use Yii;
 
 /**
@@ -21,8 +22,9 @@ class AccountDeletion
     /** the reason the account cannot be deleted right now, or '' when it can */
     public static function blocker($userId, $role)
     {
+        $db = self::dbForRole($role);
         $col = $role === 'Driver' ? 'driver_id' : 'user_id';
-        $open = (int) Yii::$app->db->createCommand(
+        $open = (int) $db->createCommand(
             "SELECT COUNT(*) FROM booking WHERE $col = :u AND status IN (" . self::OPEN_RIDE_STATUSES . ')',
             [':u' => $userId]
         )->queryScalar();
@@ -33,7 +35,7 @@ class AccountDeletion
     /** erases the personal data of the user and logs the request; returns [ok, message] */
     public static function deleteUser($userId, $role, $source = 'app', $reason = '')
     {
-        $db = Yii::$app->db;
+        $db = self::dbForRole($role);
         $user = $db->createCommand('SELECT id, first_name, last_name, contact_no, user_role FROM user WHERE id = :u', [':u' => $userId])->queryOne();
         if (!$user || $user['user_role'] !== $role) {
             return [false, 'Account not found.'];
@@ -86,10 +88,20 @@ class AccountDeletion
      */
     public static function logWebRequest($contact, $name, $role, $reason)
     {
-        $user = Yii::$app->db->createCommand('SELECT id FROM user WHERE contact_no = :c AND user_role = :r', [':c' => $contact, ':r' => $role])->queryScalar();
-        Yii::$app->db->createCommand()->insert('account_deletion_request', [
+        $db = self::dbForRole($role);
+        $user = $db->createCommand('SELECT id FROM user WHERE contact_no = :c AND user_role = :r', [':c' => $contact, ':r' => $role])->queryScalar();
+        $db->createCommand()->insert('account_deletion_request', [
             'user_id' => $user ?: null, 'role' => $role, 'contact_no' => $contact, 'name' => mb_substr($name, 0, 120),
             'reason' => mb_substr($reason, 0, 500), 'source' => 'web', 'status' => self::STATUS_PENDING, 'requested_on' => date('Y-m-d H:i:s'),
         ])->execute();
+    }
+
+    private static function dbForRole($role)
+    {
+        if ($role === User::ROLE_USER && Yii::$app->has('customerDb')) {
+            return Yii::$app->customerDb;
+        }
+
+        return Yii::$app->db;
     }
 }

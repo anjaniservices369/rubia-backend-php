@@ -98,6 +98,38 @@ try {
         $checks++;
     }
 
+    $deletionController = new app\modules\admin\controllers\AccountDeletionController('account-deletion', $module);
+    $deletionAction = new yii\base\InlineAction('index', $deletionController, 'actionIndex');
+    $app->params['customerDashboard'] = true;
+    $app->params['serviceDashboard'] = -1;
+    $app->user->setIdentity($identity(User::ROLE_ADMIN));
+    $deletionAccess = Yii::createObject($deletionController->behaviors()['access']);
+    $assert($deletionAccess->beforeAction($deletionAction), 'Customer dashboard admin must see deletion audit.');
+
+    $app->user->setIdentity($identity(User::ROLE_SUBADMIN));
+    $deletionAccess = Yii::createObject($deletionController->behaviors()['access']);
+    try {
+        $deletionAccess->beforeAction($deletionAction);
+        throw new RuntimeException('Sub-admin must not see deletion audit.');
+    } catch (yii\web\ForbiddenHttpException $expected) {
+        $checks++;
+    }
+
+    $app->params['customerDashboard'] = false;
+    $app->params['serviceDashboard'] = 1;
+    $app->user->setIdentity($identity(User::ROLE_ADMIN));
+    $deletionAccess = Yii::createObject($deletionController->behaviors()['access']);
+    try {
+        $deletionAccess->beforeAction($deletionAction);
+        throw new RuntimeException('Other service dashboard admin must not see customer deletion audit.');
+    } catch (yii\web\ForbiddenHttpException $expected) {
+        $checks++;
+    }
+
+    $app->params['serviceDashboard'] = 0;
+    $deletionAccess = Yii::createObject($deletionController->behaviors()['access']);
+    $assert($deletionAccess->beforeAction($deletionAction), 'Main admin must see customer deletion audit.');
+
     foreach ([User::ROLE_USER, User::ROLE_DRIVER, User::ROLE_TAXI] as $role) {
         $app->user->setIdentity($identity($role));
         try {

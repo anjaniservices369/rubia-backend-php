@@ -50,6 +50,12 @@ php yii db/down --yes      # revert the most recently applied script
 | 035 | `035_pincode_map` | Pincode map support. |
 | 036 | `036_account_deletion_request` | Account-deletion request records. |
 
+Migration 036 belongs on the customer service database. When the customer database is configured
+with `DB_DSN_CUSTOMER`, inspect it with `php yii db/status --customer=1`. Apply only migration
+036 with `php yii db/apply 036_account_deletion_request --customer=1 --yes` after the normal
+backup and approval checks. This avoids applying unrelated pending platform migrations to the
+separate customer database.
+
 This index is a short orientation, not a substitute for reviewing the SQL. Always read the
 exact `.up.sql` and `.down.sql` files for the intended schema before applying a change. Some
 later migrations do not have a down script; `db/down` cannot reverse those changes.

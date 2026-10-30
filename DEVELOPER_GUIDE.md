@@ -491,7 +491,7 @@ Plain-language version: BUSINESS_GUIDE.md section 24. This is where the code is.
 - Customer `cancel-ride`: a Waiting booking is cancelled free; an Accepted / On the way booking is cancelled with the cancellation charge (`cancel_ride_charges`,
   the partner is credited charge minus the admin earning). Both mark every offer row user-cancelled.
 
-**Migrations.** Numbered SQL in `app/database/migrations` run by `php yii db/up --yes` (not `app/migrations/*.php`, which nothing runs):
+**Migrations.** Numbered SQL in `app/database/migrations` run by `php yii db/up --yes` (not `app/migrations/*.php`, which nothing runs). For the account-deletion table on the separate customer database, inspect with `php yii db/status --customer=1` and apply only `036_account_deletion_request` using `php yii db/apply 036_account_deletion_request --customer=1 --yes` after backup and review:
 031 `page_app_key`, 032 `booking_route_log`, 033 `booking_radius_alert`, 034 `booking_live_track`. Each has a down script.
 
 **Fare notes.** Night fares add GST like day fares (the night branch of `calculateIntercityOneWayEstimate` used to leave it out of the total).
@@ -536,7 +536,7 @@ hand-drawn one when judging the pickup. `PincodeAreas::lookup` asks OpenStreetMa
 saves with `savePincodeMap` and has a "Remove the pincode map" button.
 
 ## 13. Account deletion
-`app/components/AccountDeletion.php` (`blocker`, `deleteUser`, `logWebRequest`); endpoints `POST api/user/delete-account` and `POST api/driver/delete-account` (auth_code header); public page `GET/POST /account-deletion` (`SiteController::actionAccountDeletion`, view `views/site/account-deletion.php`); table `account_deletion_request` (migration 036). `deleteUser` sets `status = 2`, blanks the personal columns, deletes the phone login link (`auth` row, otherwise the number would log back into the deleted account), sessions, saved places and emergency contacts, and refuses while a booking is in status 1, 2, 4, 5 or 6. Web requests are only logged for support to process (nobody is signed in on that page).
+Customer deletion is handled by `customer/backend/modules/customerapp/controllers/UserAppActions.php` and writes through the customer database connection; the customer dashboard and main admin dashboard expose a metadata-only audit list at `/admin/account-deletion/index`. The main admin dashboard reads the customer database via `DB_DSN_CUSTOMER`. The driver endpoint continues to use its service database. `app/components/AccountDeletion.php` checks open bookings in the corresponding database, erases personal profile details, removes login credentials, sessions, saved places and emergency contacts, and records the request in `account_deletion_request` (migration 036). Requests from the public `GET/POST /account-deletion` page are stored in the database for the selected role and await support confirmation.
 
 ## 14. Running everything on a development machine (28 Oct 2026)
 

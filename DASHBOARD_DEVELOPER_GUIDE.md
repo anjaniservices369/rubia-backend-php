@@ -70,13 +70,17 @@ groups:
 | Platform/identity | `user`, `auth`, `auth_session`, `web_setting`, `city`, `services`, RBAC |
 | Halting driver | `booking`, `booking_logs`, `accepted_bookings`, `driver_requests`, `driver_earnings`, `driver_wallet`, `driver_subscription`, `vehicle_verification`, `driver_booking_ratings`, `user_booking_ratings` |
 | Taxi/Auto/Bike | `ride_request`, `taxi_driver_request`, `ride_earnings`, `taxi_payout`, `taxi_rating`, `driver_wallet`, `service_map` |
-| Customer | `user_wallet`, `wallet`, `favourite_location`, `user_emergency_contacts`, `coupon`, `coupons_applied`, referrals |
+| Customer | `user_wallet`, `wallet`, `favourite_location`, `user_emergency_contacts`, `coupon`, `coupons_applied`, referrals, `account_deletion_request` |
 | Shared billing/media | `service_billing_profile`, `service_invoice_counter`, `service_invoice`, `media`, payment logs/orders |
 
 This is a navigation aid, not a complete schema definition. The owner and future target
 ownership plan are in [ARCHITECTURE_TARGET.md](ARCHITECTURE_TARGET.md). Consult actual
 migrations/models for column types, nullability, indexes and constraints; never infer a
 foreign key or unique booking link from a matching driver, timestamp or amount.
+
+The customer service API and dashboard use `DB_DSN_CUSTOMER`. The main admin dashboard reads
+customer account-deletion audit metadata through the separate `customerDb` connection, also
+configured by `DB_DSN_CUSTOMER`; keep that credential restricted to the required customer DB.
 
 For financial views, keep service and module filters explicit. Driver-service booking gross,
 GST/commission and driver net are distinct values. Taxi payout/earning tables are not

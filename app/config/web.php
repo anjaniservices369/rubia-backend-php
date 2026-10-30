@@ -6,6 +6,10 @@ use app\models\User;
 
 $params = require __DIR__ . '/params.php';
 $db = require __DIR__ . '/db.php';
+$customerDb = $db;
+$customerDb['dsn'] = getenv('DB_DSN_CUSTOMER') ?: $db['dsn'];
+$customerDb['username'] = getenv('DB_USER_CUSTOMER') ?: $db['username'];
+$customerDb['password'] = getenv('DB_PASSWORD_CUSTOMER') ?: $db['password'];
 // services that live in their own folder (services/<service>): class map + the views of their dashboards
 $serviceCode = require __DIR__ . '/services-classmap.php';
 // var_dump(\Yii::$app->user->id);
@@ -144,6 +148,8 @@ $config = [
 				],
 				
 				'db' => $db,
+				// Main admin reads customer-owned audit data through the customer service database.
+				'customerDb' => $customerDb,
 				'urlManager' => [ 
 						'class' => 'yii\web\UrlManager',
 						// Disable index.php

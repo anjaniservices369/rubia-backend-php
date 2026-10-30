@@ -2,6 +2,10 @@
 
 $params = require __DIR__ . '/params.php';
 $db = require __DIR__ . '/db.php';
+$customerDb = $db;
+$customerDb['dsn'] = getenv('DB_DSN_CUSTOMER') ?: $db['dsn'];
+$customerDb['username'] = getenv('DB_USER_CUSTOMER') ?: $db['username'];
+$customerDb['password'] = getenv('DB_PASSWORD_CUSTOMER') ?: $db['password'];
 require __DIR__ . '/services-classmap.php';   // classes of the services that live in services/<service>
 
 $config = [
@@ -24,6 +28,7 @@ $config = [
             ],
         ],
         'db' => $db,
+        'customerDb' => $customerDb,
     ],
     'params' => $params,
     /*

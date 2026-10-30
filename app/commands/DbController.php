@@ -20,11 +20,13 @@ class DbController extends Controller
 {
     /** @var bool required for anything that changes the database */
     public $yes = false;
+    /** @var bool use the customer service database instead of the default database */
+    public $customer = false;
 
     // [doc:start] options - Options
     public function options($actionID)
     {
-        return array_merge(parent::options($actionID), ['yes']);
+        return array_merge(parent::options($actionID), ['yes', 'customer']);
     }
     // [doc:end] options
 
@@ -39,6 +41,35 @@ class DbController extends Controller
         return ExitCode::OK;
     }
     // [doc:end] actionStatus
+
+    public function actionApply($name)
+    {
+        $scripts = $this->scripts();
+        if (!isset($scripts[$name])) {
+            $this->stderr("unknown migration: $name\n");
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        if (isset($this->applied()[$name])) {
+            $this->stdout("already applied: $name\n");
+            return ExitCode::OK;
+        }
+
+        if (!$this->yes) {
+            $this->stdout("dry run - would apply $name; add --yes after backup and review\n");
+            return ExitCode::OK;
+        }
+
+        $this->stdout("applying $name ... ");
+        $this->executeFile($scripts[$name]['up']);
+        $this->db()->createCommand()->insert('db_migration_log', [
+            'name' => $name,
+            'applied_on' => date('Y-m-d H:i:s'),
+        ])->execute();
+        $this->stdout("done\n");
+
+        return ExitCode::OK;
+    }
 
     // [doc:start] actionUp - Up
     public function actionUp()
@@ -60,7 +91,7 @@ class DbController extends Controller
         foreach ($pending as $name => $files) {
             $this->stdout("applying $name ... ");
             $this->executeFile($files['up']);
-            Yii::$app->db->createCommand()->insert('db_migration_log', ['name' => $name, 'applied_on' => date('Y-m-d H:i:s')])->execute();
+            $this->db()->createCommand()->insert('db_migration_log', ['name' => $name, 'applied_on' => date('Y-m-d H:i:s')])->execute();
             $this->stdout("done\n");
         }
 
@@ -88,7 +119,7 @@ class DbController extends Controller
             return ExitCode::OK;
         }
         $this->executeFile($scripts[$name]['down']);
-        Yii::$app->db->createCommand()->delete('db_migration_log', ['name' => $name])->execute();
+        $this->db()->createCommand()->delete('db_migration_log', ['name' => $name])->execute();
         $this->stdout("reverted\n");
 
         return ExitCode::OK;
@@ -112,11 +143,11 @@ class DbController extends Controller
 
     private function applied()
     {
-        Yii::$app->db->createCommand(
+        $this->db()->createCommand(
             'CREATE TABLE IF NOT EXISTS db_migration_log (name varchar(120) NOT NULL PRIMARY KEY, applied_on datetime NOT NULL) ENGINE=InnoDB'
         )->execute();
 
-        return array_flip(Yii::$app->db->createCommand('SELECT name FROM db_migration_log ORDER BY applied_on, name')->queryColumn());
+        return array_flip($this->db()->createCommand('SELECT name FROM db_migration_log ORDER BY applied_on, name')->queryColumn());
     }
 
     private function executeFile($file)
@@ -125,8 +156,13 @@ class DbController extends Controller
         foreach (preg_split('/;\s*(\r?\n|$)/', $sql) as $statement) {
             $statement = trim($statement);
             if ($statement !== '') {
-                Yii::$app->db->createCommand($statement)->execute();
+                $this->db()->createCommand($statement)->execute();
             }
         }
+    }
+
+    private function db()
+    {
+        return $this->customer ? Yii::$app->customerDb : Yii::$app->db;
     }
 }

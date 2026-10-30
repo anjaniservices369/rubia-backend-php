@@ -87,6 +87,7 @@ class UserController extends BKController
                             'resend-otp',
                             'index',
                             'update-profile',
+                            'delete-account',
                             'add-user-emergency-contacts',
                             'add-emergency-contact',
                             'update-emergency-contact',

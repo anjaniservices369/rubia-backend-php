@@ -90,6 +90,39 @@ trait UserAppActions
     }
 
     // [doc:end] actionLogout
+
+    // [doc:start] actionDeleteAccount - Deletes the signed-in customer account from the customer service database
+    /**
+     * Deletes the signed-in customer account and its personal data.
+     * The customer service entry point configures Yii::$app->db to use the customer database.
+     */
+    public function actionDeleteAccount()
+    {
+        $headers = isset(Yii::$app->request->headers['auth_code'])
+            ? Yii::$app->request->headers['auth_code']
+            : Yii::$app->request->getQueryParam('auth_code');
+        $userId = (new AuthSettings())->getAuthSession($headers);
+        if (empty($userId)) {
+            return $this->sendJsonResponse([
+                'status' => self::API_NOK,
+                'error' => Yii::t('app', 'You are not logged in'),
+            ]);
+        }
+
+        [$ok, $message] = \app\components\AccountDeletion::deleteUser(
+            $userId,
+            User::ROLE_USER,
+            'app',
+            (string) Yii::$app->request->post('reason', '')
+        );
+
+        return $this->sendJsonResponse([
+            'status' => $ok ? self::API_OK : self::API_NOK,
+            $ok ? 'message' : 'error' => Yii::t('app', $message),
+        ]);
+    }
+    // [doc:end] actionDeleteAccount
+
     // [doc:start] actionCheck - /api/user/check - Is my login still valid? The app calls this at start-up and on every screen change.
     /**
      * Is my login still valid? The app calls this at start-up and on every screen change.
